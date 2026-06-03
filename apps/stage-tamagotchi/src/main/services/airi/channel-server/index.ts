@@ -1,4 +1,5 @@
 import type { Server, ServerOptions } from '@proj-airi/server-runtime/server'
+import type { MetadataEventSource } from '@proj-airi/server-sdk'
 import type { Lifecycle } from 'injeca'
 
 import type { ElectronServerChannelConfig } from '../../../../shared/eventa'
@@ -60,18 +61,13 @@ let serverChannelCertificateTrustConfigured = false
 export interface ServerChannelModuleSnapshot {
   name: string
   index?: number
-  identity: {
-    kind: string
-    plugin?: {
-      id?: string
-    }
-  }
+  identity: MetadataEventSource
   authenticated: boolean
   healthy: boolean
   lastHeartbeatAt?: number
 }
 
-export interface DesktopServerChannel extends Server {
+export type DesktopServerChannel = Server & {
   getModuleSnapshot: () => ServerChannelModuleSnapshot[]
 }
 
