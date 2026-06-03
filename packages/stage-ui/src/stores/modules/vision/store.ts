@@ -12,6 +12,7 @@ export const useVisionStore = defineStore('vision', () => {
   const activeModel = useLocalStorageManualReset('settings/vision/active-model', '')
   const activeCustomModelName = useLocalStorageManualReset('settings/vision/active-custom-model', '')
   const ollamaThinkingEnabled = useLocalStorageManualReset('settings/vision/ollama-thinking-enabled', false)
+  const autoRun = useLocalStorageManualReset('settings/vision/auto-run', false)
   const modelSearchQuery = refManualReset('')
 
   const providerMetadata = computed(() => {
@@ -80,6 +81,7 @@ export const useVisionStore = defineStore('vision', () => {
     activeModel,
     customModelName: activeCustomModelName,
     ollamaThinkingEnabled,
+    autoRun,
     modelSearchQuery,
 
     supportsModelListing,

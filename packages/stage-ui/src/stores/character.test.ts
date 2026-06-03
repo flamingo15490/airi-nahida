@@ -5,7 +5,9 @@ import { setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { setCharacterLlmMarkerParserFactoryForTest, useCharacterStore } from './character'
+import { useExternalMemoryStore } from './external-memory-store'
 import { useAiriCardStore } from './modules'
+import { useNahidaPersonaStore } from './nahida-persona-store'
 import { useSpeechRuntimeStore } from './speech-runtime'
 
 vi.mock('vue-i18n', () => ({
@@ -91,6 +93,101 @@ describe('store character', () => {
 
     expect(store.name).toBe('Hero')
     expect(store.systemPrompt).toBe('You are a brave adventurer in Minecraft.')
+  })
+
+  it('adds the Nahida supplement once when the active card matches', () => {
+    const airiCardStore = useAiriCardStore()
+    // @ts-expect-error - testing purpose
+    airiCardStore.systemPrompt = 'Base card prompt.'
+    // @ts-expect-error - testing purpose
+    airiCardStore.activeCard = {
+      name: 'Nahida',
+      version: '1.0',
+      extensions: {
+        airi: {
+          agents: {},
+          modules: {
+            consciousness: {
+              provider: 'mock-provider',
+              model: 'mock-model',
+            },
+            speech: {
+              provider: 'mock-speech-provider',
+              model: 'mock-speech-model',
+              voice_id: 'alloy',
+            },
+          },
+        },
+      },
+    } satisfies AiriCard
+
+    const personaStore = useNahidaPersonaStore()
+    personaStore.applySettings({
+      enabled: true,
+      mode: 'balanced',
+    })
+
+    const store = useCharacterStore()
+    const prompt = store.systemPrompt
+
+    expect(prompt).toContain('Base card prompt.')
+    expect(prompt).toContain('[Nahida Persona Supplement]')
+    expect(prompt).toContain('Keep the current active card as the base persona.')
+    expect(prompt).toContain('Fact anchors:')
+    expect(prompt).toContain('birthday celebrated on October 27')
+    expect(prompt.match(/\[Nahida Persona Supplement\]/g)).toHaveLength(1)
+  })
+
+  it('adds the external memory supplement once when trusted memory is available', async () => {
+    const memoryStore = useExternalMemoryStore()
+    memoryStore.setBridge({
+      loadMemoryContext: async () => ({
+        state: 'ready',
+        summary: 'Loaded.',
+        readAt: 1,
+        usedKinds: ['user-profile'],
+        documents: [],
+        sections: {
+          userProfile: ['The user prefers concise technical replies.'],
+          preferences: [],
+          followUps: [],
+          recentSummary: [],
+          characterKnowledge: [],
+        },
+      }),
+      refreshMemoryContext: async () => ({
+        state: 'ready',
+        summary: 'Loaded.',
+        readAt: 1,
+        usedKinds: ['user-profile'],
+        documents: [],
+        sections: {
+          userProfile: ['The user prefers concise technical replies.'],
+          preferences: [],
+          followUps: [],
+          recentSummary: [],
+          characterKnowledge: [],
+        },
+      }),
+      getLastMemoryUsage: async () => ({
+        bridgeState: 'ready',
+        summary: 'Loaded.',
+        recentWrites: [],
+        lastUsedDocumentKinds: ['user-profile'],
+      }),
+      writeFollowUpItems: vi.fn(),
+      writePreferencesPatch: vi.fn(),
+      writeRecentSummary: vi.fn(),
+      writeUserProfilePatch: vi.fn(),
+    })
+    await memoryStore.loadContext()
+
+    const store = useCharacterStore()
+    const prompt = store.systemPrompt
+
+    expect(prompt).toContain('[External Memory Context]')
+    expect(prompt).toContain('The user prefers concise technical replies.')
+    expect(prompt.match(/\[External Memory Context\]/g)).toHaveLength(1)
   })
 
   it('records reactions and trims to the max size', () => {

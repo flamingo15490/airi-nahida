@@ -3,8 +3,12 @@ import type { BrowserWindow } from 'electron'
 import type { I18n } from '../../../libs/i18n'
 import type { WindowAuthManager } from '../../../services/airi/auth'
 import type { ServerChannel } from '../../../services/airi/channel-server'
+import type { ExternalIntegrationsManager } from '../../../services/airi/external-integrations'
+import type { ExternalMemoryManager } from '../../../services/airi/external-memory'
 import type { GodotStageManager } from '../../../services/airi/godot-stage'
 import type { McpStdioManager } from '../../../services/airi/mcp-servers'
+import type { NahidaPersonaManager } from '../../../services/airi/nahida-persona'
+import type { ProactiveCompanionManager } from '../../../services/airi/proactive-companion'
 import type { AutoUpdater } from '../../../services/electron/auto-updater'
 import type { GlobalShortcutService } from '../../../services/electron/global-shortcut'
 import type { DevtoolsWindowManager } from '../../devtools'
@@ -16,8 +20,12 @@ import { ipcMain } from 'electron'
 
 import { electronOpenDevtoolsWindow, electronOpenSettingsDevtools } from '../../../../shared/eventa'
 import { createAuthService } from '../../../services/airi/auth'
+import { createExternalIntegrationsService } from '../../../services/airi/external-integrations'
+import { createExternalMemoryService } from '../../../services/airi/external-memory'
 import { createGodotStageService } from '../../../services/airi/godot-stage'
 import { createMcpServersService } from '../../../services/airi/mcp-servers'
+import { createNahidaPersonaService } from '../../../services/airi/nahida-persona'
+import { createProactiveCompanionService } from '../../../services/airi/proactive-companion'
 import { createWidgetsService } from '../../../services/airi/widgets'
 import { createAutoUpdaterService } from '../../../services/electron'
 import { setupBaseWindowElectronInvokes } from '../../shared/window'
@@ -30,6 +38,10 @@ export async function setupSettingsWindowInvokes(params: {
   serverChannel: ServerChannel
   godotStageManager: GodotStageManager
   mcpStdioManager: McpStdioManager
+  externalIntegrationsManager: ExternalIntegrationsManager
+  proactiveCompanionManager: ProactiveCompanionManager
+  externalMemoryManager: ExternalMemoryManager
+  nahidaPersonaManager: NahidaPersonaManager
   i18n: I18n
   windowAuthManager: WindowAuthManager
   globalShortcut: GlobalShortcutService
@@ -46,6 +58,10 @@ export async function setupSettingsWindowInvokes(params: {
   createWidgetsService({ context, widgetsManager: params.widgetsManager, window: params.settingsWindow })
   createAutoUpdaterService({ context, window: params.settingsWindow, service: params.autoUpdater })
   createMcpServersService({ context, manager: params.mcpStdioManager })
+  createExternalIntegrationsService({ context, manager: params.externalIntegrationsManager })
+  createProactiveCompanionService({ context, manager: params.proactiveCompanionManager })
+  createExternalMemoryService({ context, manager: params.externalMemoryManager })
+  createNahidaPersonaService({ context, manager: params.nahidaPersonaManager })
   createGodotStageService({ context, manager: params.godotStageManager, window: params.settingsWindow })
   createAuthService({ context, window: params.settingsWindow, windowAuthManager: params.windowAuthManager })
 

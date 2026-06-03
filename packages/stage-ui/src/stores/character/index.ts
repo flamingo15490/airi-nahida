@@ -5,7 +5,10 @@ import { defineStore, storeToRefs } from 'pinia'
 import { computed, reactive, ref } from 'vue'
 
 import { useLlmmarkerParser } from '../../composables/llm-marker-parser'
+import { useExternalMemoryStore } from '../external-memory-store'
 import { useAiriCardStore } from '../modules'
+import { joinPromptSections } from '../nahida-persona'
+import { useNahidaPersonaStore } from '../nahida-persona-store'
 import { useSpeechRuntimeStore } from '../speech-runtime'
 
 export * from './notebook'
@@ -35,9 +38,16 @@ export function setCharacterLlmMarkerParserFactoryForTest(factory: ParserFactory
 
 export const useCharacterStore = defineStore('character', () => {
   const { activeCard, systemPrompt } = storeToRefs(useAiriCardStore())
+  const externalMemoryStore = useExternalMemoryStore()
+  const nahidaPersonaStore = useNahidaPersonaStore()
 
   const name = computed(() => activeCard.value?.name ?? '')
   const ownerId = computed(() => activeCard.value?.name ?? 'default')
+  const systemPromptWithSupplement = computed(() => joinPromptSections(
+    systemPrompt.value,
+    externalMemoryStore.activeSupplement,
+    nahidaPersonaStore.activeSupplement,
+  ))
 
   const reactions = ref<CharacterSparkNotifyReaction[]>([])
   const streamingReactions = ref<Map<string, StreamingReactionState>>(new Map())
@@ -143,7 +153,7 @@ export const useCharacterStore = defineStore('character', () => {
   return {
     name,
     reactions,
-    systemPrompt,
+    systemPrompt: systemPromptWithSupplement,
 
     recordSparkNotifyReaction,
     onSparkNotifyReactionStreamEvent,

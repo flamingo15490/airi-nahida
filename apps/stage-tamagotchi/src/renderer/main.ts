@@ -14,6 +14,7 @@ import { routes } from 'vue-router/auto-routes'
 
 import App from './App.vue'
 
+import { restoreLegacyFileOriginStorageIfNeeded } from './legacy-file-origin-storage'
 import { i18n } from './modules/i18n'
 
 import '@unocss/reset/tailwind.css'
@@ -36,6 +37,8 @@ import '@fontsource/kiwi-maru/index.css'
 import '@fontsource/m-plus-rounded-1c/index.css'
 import '@fontsource-variable/nunito/index.css'
 
+const LEGACY_STORAGE_RELOAD_MARKER = '__airi_legacy_file_origin_storage_reloaded__'
+
 const pinia = createPinia()
 
 const router = createRouter({
@@ -44,13 +47,23 @@ const router = createRouter({
   routes: setupLayouts(routes as RouteRecordRaw[]),
 })
 
-createApp(App)
-  .use(MotionPlugin)
-  // TODO: Fix autoAnimatePlugin type error
-  .use(autoAnimatePlugin as unknown as Plugin)
-  .use(router)
-  .use(pinia)
-  .use(PiniaColada)
-  .use(i18n)
-  .use(Tres)
-  .mount('#app')
+const restoredLegacyFileOriginStorage = await restoreLegacyFileOriginStorageIfNeeded()
+
+if (restoredLegacyFileOriginStorage && !window.sessionStorage.getItem(LEGACY_STORAGE_RELOAD_MARKER)) {
+  window.sessionStorage.setItem(LEGACY_STORAGE_RELOAD_MARKER, '1')
+  window.location.reload()
+}
+else {
+  window.sessionStorage.removeItem(LEGACY_STORAGE_RELOAD_MARKER)
+
+  createApp(App)
+    .use(MotionPlugin)
+    // TODO: Fix autoAnimatePlugin type error
+    .use(autoAnimatePlugin as unknown as Plugin)
+    .use(router)
+    .use(pinia)
+    .use(PiniaColada)
+    .use(i18n)
+    .use(Tres)
+    .mount('#app')
+}

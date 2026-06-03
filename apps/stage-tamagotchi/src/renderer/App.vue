@@ -10,12 +10,16 @@ import { useCharacterOrchestratorStore } from '@proj-airi/stage-ui/stores/charac
 import { useChatSessionStore } from '@proj-airi/stage-ui/stores/chat/session-store'
 import { usePluginHostInspectorStore } from '@proj-airi/stage-ui/stores/devtools/plugin-host-debug'
 import { useDisplayModelsStore } from '@proj-airi/stage-ui/stores/display-models'
+import { useExternalMemoryStore } from '@proj-airi/stage-ui/stores/external-memory-store'
 import { useModsServerChannelStore } from '@proj-airi/stage-ui/stores/mods/api/channel-server'
 import { useContextBridgeStore } from '@proj-airi/stage-ui/stores/mods/api/context-bridge'
 import { useAiriCardStore } from '@proj-airi/stage-ui/stores/modules/airi-card'
 import { useArtistryStore } from '@proj-airi/stage-ui/stores/modules/artistry'
+import { useVisionStore } from '@proj-airi/stage-ui/stores/modules/vision'
+import { useNahidaPersonaStore } from '@proj-airi/stage-ui/stores/nahida-persona-store'
 import { usePerfTracerBridgeStore } from '@proj-airi/stage-ui/stores/perf-tracer-bridge'
 import { listProvidersForPluginHost, shouldPublishPluginHostCapabilities } from '@proj-airi/stage-ui/stores/plugin-host-capabilities'
+import { useProactiveCompanionStore } from '@proj-airi/stage-ui/stores/proactive-companion-store'
 import { useSettings, useSettingsAudioDevice } from '@proj-airi/stage-ui/stores/settings'
 import { useTheme } from '@proj-airi/ui'
 import { storeToRefs } from 'pinia'
@@ -26,9 +30,25 @@ import { toast, Toaster } from 'vue-sonner'
 import ResizeHandler from './components/ResizeHandler.vue'
 
 import {
+  electronExternalMemoryGetLastUsage,
+  electronExternalMemoryLoadContext,
+  electronExternalMemoryRefreshContext,
+  electronExternalMemoryWriteFollowUpItems,
+  electronExternalMemoryWritePreferencesPatch,
+  electronExternalMemoryWriteRecentSummary,
+  electronExternalMemoryWriteUserProfilePatch,
   electronGetServerChannelConfig,
   electronGodotStageGetStatus,
   electronGodotStageStatusChanged,
+  electronNahidaPersonaGetConfig,
+  electronNahidaPersonaSaveConfig,
+  electronProactiveCompanionClearHistory,
+  electronProactiveCompanionEvaluateSparkNotify,
+  electronProactiveCompanionGetRuntimeSnapshot,
+  electronProactiveCompanionLoadConfig,
+  electronProactiveCompanionRecordContextUpdate,
+  electronProactiveCompanionRefreshRuntime,
+  electronProactiveCompanionSaveConfig,
   electronSettingsNavigate,
   electronStartTrackMousePosition,
   i18nGetLocale,
@@ -51,6 +71,7 @@ import {
 import { initializeElectronAuthCallbackBridge } from './bridges/electron-auth-callback'
 import { initializeStageThreeRuntimeTraceBridge } from './bridges/stage-three-runtime-trace'
 import { useLanguage } from './composables/use-language'
+import { useVisionRunner } from './composables/use-vision-runner'
 import { createChatSyncWindowLifecycle } from './stores/chat-sync-lifecycle'
 import { useTamagotchiMcpToolsStore } from './stores/mcp-tools'
 import { useTamagotchiPluginToolsStore } from './stores/plugin-tools'
@@ -72,12 +93,18 @@ const characterOrchestratorStore = useCharacterOrchestratorStore()
 const analyticsStore = useSharedAnalyticsStore()
 const inferencePreload = useInferencePreload()
 const pluginHostInspectorStore = usePluginHostInspectorStore()
+const nahidaPersonaStore = useNahidaPersonaStore()
+const externalMemoryStore = useExternalMemoryStore()
+const proactiveCompanionStore = useProactiveCompanionStore()
 const mcpToolsStore = useTamagotchiMcpToolsStore()
 const pluginToolsStore = useTamagotchiPluginToolsStore()
 const stageWindowLifecycleStore = useStageWindowLifecycleStore()
 const settingsAudioDeviceStore = useSettingsAudioDevice()
 const artistryStore = useArtistryStore()
+const visionStore = useVisionStore()
+const visionRunner = useVisionRunner()
 const { activeProvider, artistryGlobals, activeModel, defaultPromptPrefix, providerOptions } = storeToRefs(artistryStore)
+const { autoRun: visionAutoRun, configured: visionConfigured } = storeToRefs(visionStore)
 const context = useElectronEventaContext()
 usePerfTracerBridgeStore()
 initializeStageThreeRuntimeTraceBridge()
@@ -92,6 +119,22 @@ const loadPlugin = useElectronEventaInvoke(electronPluginLoad)
 const unloadPlugin = useElectronEventaInvoke(electronPluginUnload)
 const inspectPluginHost = useElectronEventaInvoke(electronPluginInspect)
 const startTrackingCursorPoint = useElectronEventaInvoke(electronStartTrackMousePosition)
+const getNahidaPersonaConfig = useElectronEventaInvoke(electronNahidaPersonaGetConfig)
+const saveNahidaPersonaConfig = useElectronEventaInvoke(electronNahidaPersonaSaveConfig)
+const loadExternalMemoryContext = useElectronEventaInvoke(electronExternalMemoryLoadContext)
+const refreshExternalMemoryContext = useElectronEventaInvoke(electronExternalMemoryRefreshContext)
+const getExternalMemoryUsage = useElectronEventaInvoke(electronExternalMemoryGetLastUsage)
+const writeExternalMemoryRecentSummary = useElectronEventaInvoke(electronExternalMemoryWriteRecentSummary)
+const writeExternalMemoryFollowUpItems = useElectronEventaInvoke(electronExternalMemoryWriteFollowUpItems)
+const writeExternalMemoryUserProfilePatch = useElectronEventaInvoke(electronExternalMemoryWriteUserProfilePatch)
+const writeExternalMemoryPreferencesPatch = useElectronEventaInvoke(electronExternalMemoryWritePreferencesPatch)
+const loadProactiveCompanionConfig = useElectronEventaInvoke(electronProactiveCompanionLoadConfig)
+const saveProactiveCompanionConfig = useElectronEventaInvoke(electronProactiveCompanionSaveConfig)
+const getProactiveCompanionRuntimeSnapshot = useElectronEventaInvoke(electronProactiveCompanionGetRuntimeSnapshot)
+const refreshProactiveCompanionRuntime = useElectronEventaInvoke(electronProactiveCompanionRefreshRuntime)
+const clearProactiveCompanionHistory = useElectronEventaInvoke(electronProactiveCompanionClearHistory)
+const evaluateProactiveCompanionSparkNotify = useElectronEventaInvoke(electronProactiveCompanionEvaluateSparkNotify)
+const recordProactiveCompanionContextUpdate = useElectronEventaInvoke(electronProactiveCompanionRecordContextUpdate)
 const reportPluginCapability = useElectronEventaInvoke(electronPluginUpdateCapability)
 const getMainLocale = useElectronEventaInvoke(i18nGetLocale)
 const setLocale = useElectronEventaInvoke(i18nSetLocale)
@@ -100,7 +143,57 @@ const syncArtistryConfig = useElectronEventaInvoke(artistrySyncConfig)
 const chatSyncLifecycle = createChatSyncWindowLifecycle(route.path)
 const isChatWindowRoute = () => route.path === '/chat'
 const isGodotStageRoute = () => route.path === '/' || route.path.startsWith('/settings')
+const isVisionOwnerRoute = () => route.path === '/'
 const isWidgetsWindowRoute = () => route.path === '/widgets'
+
+async function recordProactiveCompanionContextUpdates(
+  updates: Array<Record<string, unknown>> | undefined,
+  parentEventId?: string,
+) {
+  if (!updates?.length) {
+    return
+  }
+
+  for (const [index, update] of updates.entries()) {
+    if (!update || typeof update !== 'object') {
+      continue
+    }
+
+    const metadata = 'metadata' in update && update.metadata && typeof update.metadata === 'object'
+      ? update.metadata as Record<string, unknown>
+      : undefined
+
+    if (metadata?.module !== 'proactive-companion') {
+      continue
+    }
+
+    try {
+      await proactiveCompanionStore.recordContextUpdate({
+        type: 'context:update',
+        metadata: parentEventId
+          ? {
+              event: {
+                id: `${parentEventId}:${index}`,
+                parentId: parentEventId,
+              },
+            }
+          : undefined,
+        data: {
+          id: typeof update.id === 'string' ? update.id : `proactive-context-update:${index}`,
+          contextId: typeof update.contextId === 'string' ? update.contextId : `proactive-context-update:${index}`,
+          strategy: update.strategy as never,
+          lane: typeof update.lane === 'string' ? update.lane : undefined,
+          text: typeof update.text === 'string' ? update.text : '',
+          destinations: Array.isArray(update.destinations) ? update.destinations as string[] : undefined,
+          metadata,
+        },
+      })
+    }
+    catch (error) {
+      console.warn('[App] Failed to record proactive companion context update from input:text:', error)
+    }
+  }
+}
 
 function syncGodotStageRenderer(state: { state: 'stopped' | 'starting' | 'running' | 'stopping' | 'error' }) {
   if (state.state === 'running') {
@@ -118,6 +211,22 @@ async function refreshPluginRuntimeTools() {
   }
   catch (error) {
     console.warn('[App] Failed to refresh plugin runtime tools:', error)
+  }
+}
+
+async function startBackgroundVisionIfEnabled() {
+  if (isChatWindowRoute() || isWidgetsWindowRoute() || !isVisionOwnerRoute() || !visionRunner.isOwnerWindow.value) {
+    return
+  }
+
+  await visionRunner.initializeSources()
+  if (!visionAutoRun.value || !visionConfigured.value || !visionRunner.hasPermissions.value || !visionRunner.activeSourceId.value) {
+    return
+  }
+
+  const started = await visionRunner.startCaptureLoop()
+  if (!started && visionRunner.errorMessage.value) {
+    console.warn('[App] Failed to auto-start vision runner:', visionRunner.errorMessage.value)
   }
 }
 
@@ -152,6 +261,31 @@ pluginHostInspectorStore.setBridge({
   inspect: () => inspectPluginHost(),
 })
 
+nahidaPersonaStore.setBridge({
+  getConfig: () => getNahidaPersonaConfig(),
+  saveConfig: settings => saveNahidaPersonaConfig(settings),
+})
+
+externalMemoryStore.setBridge({
+  loadMemoryContext: request => loadExternalMemoryContext(request),
+  refreshMemoryContext: request => refreshExternalMemoryContext(request),
+  getLastMemoryUsage: () => getExternalMemoryUsage(),
+  writeRecentSummary: request => writeExternalMemoryRecentSummary(request),
+  writeFollowUpItems: request => writeExternalMemoryFollowUpItems(request),
+  writeUserProfilePatch: request => writeExternalMemoryUserProfilePatch(request),
+  writePreferencesPatch: request => writeExternalMemoryPreferencesPatch(request),
+})
+
+proactiveCompanionStore.setBridge({
+  loadConfig: () => loadProactiveCompanionConfig(),
+  saveConfig: settings => saveProactiveCompanionConfig(settings),
+  getRuntimeSnapshot: () => getProactiveCompanionRuntimeSnapshot(),
+  refreshRuntime: () => refreshProactiveCompanionRuntime(),
+  clearHistory: () => clearProactiveCompanionHistory(),
+  evaluateSparkNotify: event => evaluateProactiveCompanionSparkNotify(event),
+  recordContextUpdate: event => recordProactiveCompanionContextUpdate(event),
+})
+
 // NOTICE: Runtime tool stores must register during setup so renderer consumers can see them
 // before `onMounted()` finishes the rest of the startup flow.
 void mcpToolsStore.refresh().catch((error) => {
@@ -177,6 +311,10 @@ const { updateThemeColor } = useThemeColor(themeColorFromValue({ light: 'rgb(255
 watch(dark, () => updateThemeColor(), { immediate: true })
 watch(route, () => updateThemeColor(), { immediate: true })
 onMounted(() => updateThemeColor())
+onMounted(() => {
+  void proactiveCompanionStore.refreshConfig().catch(() => {})
+  void proactiveCompanionStore.refreshRuntime().catch(() => {})
+})
 
 context.value.on(electronSettingsNavigate, (event) => {
   const targetRoute = event?.body?.route
@@ -209,13 +347,22 @@ onMounted(async () => {
   await restoreLocale()
 
   analyticsStore.initialize()
+  await nahidaPersonaStore.refresh().catch((error) => {
+    console.warn('[App] Failed to refresh Nahida persona settings:', error)
+  })
   await displayModelsStore.initialize()
   cardStore.initialize()
+  await externalMemoryStore.refreshUsage().catch((error) => {
+    console.warn('[App] Failed to fetch external memory usage:', error)
+  })
 
   await chatSessionStore.initialize()
   await displayModelsStore.loadDisplayModelsFromIndexedDB()
   await settingsStore.initializeStageModel()
   await settingsAudioDeviceStore.initialize()
+  await externalMemoryStore.refreshContext().catch((error) => {
+    console.warn('[App] Failed to refresh external memory context:', error)
+  })
 
   if (isGodotStageRoute()) {
     try {
@@ -235,6 +382,29 @@ onMounted(async () => {
     token: serverChannelConfig.authToken || undefined,
     possibleEvents: ['ui:configure'],
   }).catch(err => console.error('Failed to initialize Mods Server Channel in App.vue:', err))
+  serverChannelStore.onContextUpdate(async (event) => {
+    if (event.data.metadata?.module !== 'proactive-companion') {
+      return
+    }
+
+    try {
+      await proactiveCompanionStore.recordContextUpdate(event)
+    }
+    catch (error) {
+      console.warn('[App] Failed to record proactive companion context update:', error)
+    }
+  })
+  serverChannelStore.onEvent('input:text', async (event) => {
+    try {
+      await recordProactiveCompanionContextUpdates(
+        event.data.contextUpdates as Array<Record<string, unknown>> | undefined,
+        event.metadata?.event?.id,
+      )
+    }
+    catch (error) {
+      console.warn('[App] Failed to inspect proactive companion input:text context updates:', error)
+    }
+  })
   if (!isChatWindowRoute()) {
     contextBridgeStore.initialize()
     if (!isWidgetsWindowRoute()) {
@@ -258,10 +428,45 @@ onMounted(async () => {
 
   // Preload local inference models (Kokoro TTS, etc.) in background after a delay
   inferencePreload.triggerPreload()
+  await startBackgroundVisionIfEnabled()
 })
+
+watch([
+  visionAutoRun,
+  visionConfigured,
+  () => visionRunner.activeSourceId.value,
+  () => visionRunner.hasPermissions.value,
+], ([autoRun, configured, activeSourceId, hasPermissions]) => {
+  if (isChatWindowRoute() || isWidgetsWindowRoute() || !isVisionOwnerRoute() || !visionRunner.isOwnerWindow.value) {
+    return
+  }
+
+  if (!autoRun || !configured) {
+    void visionRunner.stopCaptureLoop()
+    return
+  }
+
+  if (!activeSourceId) {
+    return
+  }
+
+  if (!hasPermissions) {
+    return
+  }
+
+  if (!visionRunner.isRunning.value) {
+    void visionRunner.startCaptureLoop()
+  }
+}, { immediate: false })
 
 onUnmounted(() => {
   chatSyncLifecycle.dispose()
+  if (visionRunner.isOwnerWindow.value) {
+    void visionRunner.stopCaptureLoop()
+  }
+  if (!isChatWindowRoute() && !isWidgetsWindowRoute()) {
+    visionRunner.cleanup()
+  }
 })
 
 watch(themeColorsHue, () => {

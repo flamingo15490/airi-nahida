@@ -4,6 +4,7 @@ import type { FileLoggerHandle } from './app/file-logger'
 
 import process, { env, platform } from 'node:process'
 
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -23,6 +24,7 @@ import icon from '../../resources/icon.png?asset'
 import { openDebugger, setupDebugger } from './app/debugger'
 import { nullFileLoggerHandle, setupFileLogger } from './app/file-logger'
 import { installSingleInstanceGuard } from './app/single-instance'
+import { resolvePreferredUserDataPath } from './app/user-data-path'
 import { createArtistryConfig } from './configs/artistry'
 import { createGlobalAppConfig } from './configs/global'
 import { emitAppBeforeQuit, emitAppReady, emitAppWindowAllClosed } from './libs/bootkit/lifecycle'
@@ -30,10 +32,14 @@ import { setElectronMainDirname } from './libs/electron/location'
 import { createI18n } from './libs/i18n'
 import { createWindowAuthManagerService } from './services/airi/auth'
 import { setupServerChannel } from './services/airi/channel-server'
+import { createExternalIntegrationsManager } from './services/airi/external-integrations'
+import { createExternalMemoryManager } from './services/airi/external-memory'
 import { setupGodotStageManager } from './services/airi/godot-stage'
 import { setupBuiltInServer } from './services/airi/http-server'
 import { setupMcpStdioManager } from './services/airi/mcp-servers'
+import { createNahidaPersonaManager } from './services/airi/nahida-persona'
 import { setupPluginHost } from './services/airi/plugins'
+import { createProactiveCompanionManager } from './services/airi/proactive-companion'
 import { setupArtistryBridge } from './services/airi/widgets/artistry-bridge'
 import { setupAutoUpdater } from './services/electron/auto-updater'
 import { setupGlobalShortcutService } from './services/electron/global-shortcut'
@@ -62,9 +68,42 @@ setupDebugger()
 
 const log = useLogg('main').useGlobalConfig()
 
-const appUserDataPath = env.APP_USER_DATA_PATH?.trim()
-if (appUserDataPath) {
-  app.setPath('userData', appUserDataPath)
+const preferredUserDataPath = resolvePreferredUserDataPath({
+  appDataPath: app.getPath('appData'),
+  devMode: !!env.ELECTRON_RENDERER_URL,
+  envUserDataPath: env.APP_USER_DATA_PATH,
+  pathExists: existsSync,
+})
+
+if (preferredUserDataPath.path) {
+  app.setPath('userData', preferredUserDataPath.path)
+  // NOTICE:
+  // AIRI source preview may override only Electron's userData path while Chromium
+  // still keeps renderer-backed storage (Local Storage / IndexedDB / cookies) under
+  // the default sessionData root for the current app id. That split makes file-based
+  // config such as mcp.json look migrated while renderer state like cards and LLM
+  // providers still appears as a fresh install.
+  // Source/context: Electron app path handling in source preview launcher and the
+  // observed split profile state under `ai.moeru.airi` vs `@proj-airi/stage-tamagotchi*`.
+  // Removal condition: when source preview no longer needs profile reuse across app ids.
+  app.setPath('sessionData', preferredUserDataPath.path)
+
+  try {
+    mkdirSync(app.getPath('userData'), { recursive: true })
+    writeFileSync(
+      `${app.getPath('userData')}\\source-preview-user-data-diagnostic.json`,
+      JSON.stringify({
+        candidates: preferredUserDataPath.candidates,
+        devMode: !!env.ELECTRON_RENDERER_URL,
+        selectedPath: preferredUserDataPath.path,
+        source: preferredUserDataPath.source,
+      }, null, 2),
+      'utf8',
+    )
+  }
+  catch (error) {
+    log.withError(error).warn('Failed to write source preview userData diagnostic file.')
+  }
 }
 
 // Thanks to [@blurymind](https://github.com/blurymind),
@@ -164,6 +203,29 @@ app.whenReady().then(async () => {
     build: async () => setupMcpStdioManager(),
   })
 
+  const externalIntegrationsManager = injeca.provide('modules:external-integrations-manager', {
+    dependsOn: { mcpStdioManager, serverChannel },
+    build: async ({ dependsOn }) => createExternalIntegrationsManager({
+      mcpStdioManager: dependsOn.mcpStdioManager,
+      serverChannel: dependsOn.serverChannel,
+    }),
+  })
+  const proactiveCompanionManager = injeca.provide('modules:proactive-companion-manager', {
+    dependsOn: { externalIntegrationsManager },
+    build: async ({ dependsOn }) => createProactiveCompanionManager({
+      externalIntegrationsManager: dependsOn.externalIntegrationsManager,
+    }),
+  })
+  const nahidaPersonaManager = injeca.provide('modules:nahida-persona-manager', {
+    build: async () => createNahidaPersonaManager(),
+  })
+  const externalMemoryManager = injeca.provide('modules:external-memory-manager', {
+    dependsOn: { externalIntegrationsManager },
+    build: async ({ dependsOn }) => createExternalMemoryManager({
+      externalIntegrationsManager: dependsOn.externalIntegrationsManager,
+    }),
+  })
+
   const widgetsManager = injeca.provide('windows:widgets', {
     dependsOn: { serverChannel, i18n },
     build: ({ dependsOn }) => setupWidgetsWindowManager(dependsOn),
@@ -204,12 +266,12 @@ app.whenReady().then(async () => {
   })
 
   const settingsWindow = injeca.provide('windows:settings', {
-    dependsOn: { widgetsManager, beatSync, autoUpdater, devtoolsWindow: devtoolsMarkdownStressWindow, serverChannel, godotStageManager, mcpStdioManager, i18n, windowAuthManager, globalShortcut },
+    dependsOn: { widgetsManager, beatSync, autoUpdater, devtoolsWindow: devtoolsMarkdownStressWindow, serverChannel, godotStageManager, mcpStdioManager, externalIntegrationsManager, proactiveCompanionManager, externalMemoryManager, nahidaPersonaManager, i18n, windowAuthManager, globalShortcut },
     build: async ({ dependsOn }) => setupSettingsWindowReusableFunc(dependsOn),
   })
 
   const mainWindow = injeca.provide('windows:main', {
-    dependsOn: { settingsWindow, chatWindow, widgetsManager, noticeWindow, beatSync, autoUpdater, serverChannel, godotStageManager, mcpStdioManager, i18n, onboardingWindowManager, windowAuthManager },
+    dependsOn: { settingsWindow, chatWindow, widgetsManager, noticeWindow, beatSync, autoUpdater, serverChannel, godotStageManager, mcpStdioManager, externalIntegrationsManager, proactiveCompanionManager, externalMemoryManager, nahidaPersonaManager, i18n, onboardingWindowManager, windowAuthManager },
     build: async ({ dependsOn }) => setupMainWindow({
       ...dependsOn,
       onWindowCreated: (window) => {

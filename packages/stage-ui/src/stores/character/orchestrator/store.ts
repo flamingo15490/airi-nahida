@@ -9,6 +9,7 @@ import { useCharacterNotebookStore, useCharacterStore } from '../'
 import { useLLM } from '../../llm'
 import { useModsServerChannelStore } from '../../mods/api/channel-server'
 import { useConsciousnessStore } from '../../modules/consciousness'
+import { useProactiveCompanionStore } from '../../proactive-companion-store'
 import { useProvidersStore } from '../../providers'
 
 export { sparkNotifyCommandSchema } from '@proj-airi/core-agent/agents/spark-notify'
@@ -21,6 +22,7 @@ export const useCharacterOrchestratorStore = defineStore('character-orchestrator
   const notebookStore = useCharacterNotebookStore()
   const { systemPrompt } = storeToRefs(characterStore)
   const modsServerChannelStore = useModsServerChannelStore()
+  const proactiveCompanionStore = useProactiveCompanionStore()
 
   const processing = ref(false)
   const pendingNotifies = ref<Array<WebSocketEventOf<'spark:notify'>>>([])
@@ -234,6 +236,24 @@ export const useCharacterOrchestratorStore = defineStore('character-orchestrator
     eventUnsubscribes.push(
       modsServerChannelStore.onEvent('spark:notify', async (event) => {
         try {
+          const governance = await proactiveCompanionStore.evaluateSparkNotify(event)
+          if (governance.managed) {
+            if (governance.decision?.decision !== 'delivered') {
+              return
+            }
+
+            await handleIncomingSparkNotify(event, {
+              forceTextResponse: true,
+              messageOverride: {
+                appendSystemInstructions: [
+                  'This proactive companion reminder already passed AIRI governance.',
+                  'Reply with one brief, warm, restrained reminder and do not emit spark commands.',
+                ],
+              },
+            })
+            return
+          }
+
           await handleIncomingSparkNotify(event)
         }
         catch (error) {

@@ -18,6 +18,7 @@ const {
   activeModel,
   customModelName,
   ollamaThinkingEnabled,
+  autoRun,
   modelSearchQuery,
   supportsModelListing,
   providerModels,
@@ -347,6 +348,12 @@ function formatRelativeTime(timestamp: number | null) {
           :max="15000"
           :step="250"
           :format-value="value => `${(value / 1000).toFixed(2)}s`"
+        />
+
+        <FieldCheckbox
+          v-model="autoRun"
+          label="Auto-run vision capture"
+          description="Keep the vision ticker running in the background after launch when a source is already selected."
         />
 
         <div :class="['grid', 'gap-4', 'md:grid-cols-3']">

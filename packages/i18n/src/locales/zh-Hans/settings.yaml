@@ -388,8 +388,56 @@ pages:
     upload: 上传
     upload_desc: 点击或拖拽文件到此处上传
   memory:
-    description: 存放记忆的地方，以及策略
+    description: 查看 AIRI 如何读取、使用和受控写回外部记忆。
     title: 记忆体
+    error-title: 外部记忆错误
+    panel:
+      title: 外部记忆运行时
+      description: AIRI 会从外部记忆根目录读取可信片段，作为补充上下文使用，并在受控条件下执行少量写回。
+    actions:
+      refresh: 刷新记忆上下文
+      write-summary: 写入近期摘要
+      write-summary-empty: 还没有可写入的当前聊天摘要。
+    status:
+      active-character: 当前角色
+      summary: 当前摘要
+      last-read: 最近读取
+      reply-uses-memory: 当前回复可能使用外部记忆
+      nahida-constraint: 纳西妲记忆表达层是否生效
+      nahida-summary: 纳西妲层摘要
+      yes: 是
+      no: 否
+      none: 无
+      never: 从未
+      ready: 可用
+      unavailable: 不可用
+      states:
+        ready: 可用
+        degraded: 降级
+        disabled: 已关闭
+        unavailable: 不可用
+    documents:
+      empty: 这个记忆文档暂时还没有可用片段。
+      user-profile:
+        title: 用户信息
+      preferences:
+        title: 偏好设置
+      follow-ups:
+        title: 待跟进
+      recent-summary:
+        title: 近期摘要
+      character-knowledge:
+        title: 角色知识库
+    recent-writes:
+      title: 最近写回
+      description: 受控写回会在这里留下结果，方便你核对 AIRI 改动了哪些外部记忆文件。
+      empty: 当前运行期内还没有发生受控写回。
+      last-kind: 最近写回目标
+      last-time: 最近写回时间
+      last-summary: 最近写回结果
+    guardrails:
+      title: 当前边界
+      description: 这个页面不会把原始文件系统权限直接暴露给 renderer。外部记忆不可用时，AIRI 应该优雅降级，而不是假装自己记得。
   data:
     title: Data
     description: 管理存储 AIRI 数据、导出和重置
@@ -1403,6 +1451,189 @@ pages:
       errors:
         title: 二维码扫描失败
         failed: 扫描或连接二维码失败。
+  integrations:
+    title: 本地协同
+    description: 查看并稳定当前 memory 与 companion sidecar 的协同接入状态。
+    error-title: 外部集成错误
+    actions:
+      save-memory: 保存记忆配置
+      probe-memory: 探测记忆
+      save-sidecar: 保存 sidecar 配置
+      probe-sidecar: 探测 sidecar
+      open-data-folder: 打开 AIRI 数据目录
+      import-legacy-mcp: 导入当前 AIRI 的 MCP 配置
+    compatibility:
+      title: 当前阶段边界
+      description: GPT-SoVITS、TTS adapter、ComfyUI、vision 与 context bridge 在这一阶段保持现状兼容。这个页面只负责稳定 memory 和 companion sidecar 的协同状态。
+    import:
+      title: 从当前桌面版 AIRI 导入
+      description: 当源码版没有自动带上你真实在用的本地 MCP 桥接时，点这里即可。AIRI 会读取当前桌面版 AIRI 配置目录里的 `mcp.json` 和 `server-channel-config.json`，再复制到源码版当前数据目录。
+      source-profile: 导入来源
+      target-profile: 应用目标
+    fields:
+      enabled:
+        label: 启用该集成
+        description: 让 AIRI 继续识别这条外部协同链路，并纳入手动健康检查。
+    status:
+      summary: 当前摘要
+      pending: 等待首次探测。
+      last-checked: 最近检查
+      last-success: 最近成功
+      last-error: 最近错误
+      never: 从未
+      boolean:
+        true: 是
+        false: 否
+      states:
+        ready: 可用
+        degraded: 降级
+        disabled: 已关闭
+        not-configured: 未配置
+        unknown: 未知
+    details:
+      mcpConfigPath: MCP 配置路径
+      configuredRootPath: MCP 当前根路径
+      rootPathExists: 根路径是否存在
+      rootPathIsDirectory: 根路径是否为目录
+      filesystemRuntimeState: Filesystem 服务运行状态
+      obsidianConfigured: Obsidian bridge 是否已配置
+      obsidianRuntimeState: Obsidian bridge 运行状态
+      moduleName: Sidecar 模块名
+      pluginId: Sidecar 插件 ID
+      expectedWsUrl: 期望的 AIRI WebSocket 地址
+      currentWsUrl: 当前 AIRI WebSocket 地址
+      connectedModules: 当前已连接模块
+      authenticated: 是否已认证
+      healthy: 是否健康
+      lastHeartbeatAt: 最近心跳时间
+    memory:
+      title: Memory
+      description: 将当前基于 MCP 的记忆接法正式收口成一个稳定的桌面端集成入口。
+      fields:
+        root-path:
+          label: 记忆根路径
+          description: 这里应与 AIRI 当前实际使用的外部记忆目录保持一致。
+        filesystem-server:
+          label: Filesystem MCP 服务名
+          description: AIRI 会通过这个 MCP 服务确认记忆桥接是否仍然对齐。
+        obsidian-server:
+          label: Obsidian bridge 服务名
+          description: 如果你当前的记忆体系没有使用 Obsidian bridge，可以留空。
+    sidecar:
+      title: Companion sidecar
+      description: 保持 sidecar 外部独立，但让 AIRI 能稳定识别当前 companion 模块是否已经连入当前 server channel。
+      fields:
+        enabled-description: 仅在你确认当前外部 sidecar 仍要继续和 AIRI 协同时再启用。
+        module-name:
+          label: 模块名
+          description: 与你当前 sidecar 的 `module_name` 保持一致。
+        plugin-id:
+          label: 插件 ID
+          description: 与你当前 sidecar 的 `plugin_id` 保持一致。
+        expected-ws-url:
+          label: 期望的 AIRI WebSocket 地址
+          description: 可选，用来交叉确认 sidecar 预期连接的 AIRI websocket 地址。
+  nahida-persona:
+    title: 纳西妲人格
+    description: 在当前 activeCard 之上追加纳西妲表达层，不改写原角色卡正文。
+    error-title: 纳西妲人格错误
+    panel:
+      title: 纳西妲表达层
+      description: 只有当前活跃角色卡名称命中 Nahida / 纳西妲 时，这一层才会生效。
+    actions:
+      save: 保存人格设置
+    fields:
+      enabled:
+        label: 启用纳西妲人格层
+        description: 保留当前角色卡作为基线，再额外叠加纳西妲专用的语气与记忆表达补充。
+      mode:
+        label: 记忆与主动性档位
+        description: 选择纳西妲延续前情、温柔关心与记忆表达的强度。
+    modes:
+      reserved:
+        label: 保守
+        description: 只在上下文明确时轻量引用记忆，不过度装熟。
+      balanced:
+        label: 平衡
+        description: 自然延续前情与偏好，温柔但不过界。默认推荐。
+      active:
+        label: 积极
+        description: 更主动地温柔追问与承接前情，但仍禁止杜撰记忆。
+    status:
+      active-card: 当前活跃卡
+      matches: 是否命中纳西妲卡
+      active: 人格层是否生效
+      summary: 当前摘要
+      yes: 是
+      no: 否
+      none: 无
+    guardrails:
+      title: 当前边界
+      description: 这一层只调整表达方式，不允许杜撰记忆、不覆盖原角色卡，也不会把日常对话硬变成设定说明。
+  proactive-companion:
+    title: 主动陪伴
+    description: 在提醒进入 AIRI 之前，先用桌面端的克制规则治理来自 companion sidecar 的主动事件。
+    error-title: 主动陪伴错误
+    panel:
+      title: 主动提醒治理
+      description: 保持 sidecar 外置运行，但让提醒进入 AIRI 时有明确的筛选、冷却和可见性规则。
+    actions:
+      save: 保存主动陪伴设置
+      refresh: 刷新运行状态
+      clear-history: 清空最近历史
+    fields:
+      enabled:
+        label: 启用主动陪伴协同
+        description: 让通过审核的 sidecar 提醒以克制的 spark 反应形式进入 AIRI。
+      global-cooldown:
+        label: 全局冷却（秒）
+        description: 任意两次主动提醒之间至少间隔多久。
+      topic-cooldown:
+        label: 同主题冷却（秒）
+        description: 对看起来是同一主题的重复提醒进行压制。
+      intensity:
+        label: 基础强度
+        description: 调整提醒整体呈现得更安静还是稍微明显一些。
+    intensity:
+      low:
+        label: 低频克制
+        description: 优先保持安静、低频、不打扰。
+      balanced:
+        label: 平衡
+        description: 在仍然克制的前提下，让提醒稍微更明显。
+    status:
+      states:
+        ready: 就绪
+        degraded: 降级
+        disabled: 已关闭
+        unavailable: 不可用
+      sidecar: Sidecar 连接状态
+      connected: 已连接
+      disconnected: 未连接
+      summary: 当前摘要
+      sidecar-summary: Sidecar 摘要
+      last-refresh: 最近刷新
+      last-failure: 最近失败原因
+      never: 从未
+      none: 无
+    history:
+      title: 最近主动事件
+      description: 查看哪些提醒被放行、压制或丢弃，以及对应原因。
+      latest-headline: 最新事件
+      latest-time: 最新判定时间
+      latest-presentation: 最新呈现方式
+      latest-reason: 最新原因
+      reason: 原因
+      time: 时间
+      empty: 目前还没有记录到主动陪伴事件。
+      decisions:
+        delivered: 已放行
+        suppressed: 已压制
+        deferred: 已延后
+        dropped: 已丢弃
+    guardrails:
+      title: 约束
+      description: 普通提醒默认保持简短温和，重复内容会被冷却压制，sidecar 降级或异常时要安静失败。
   system:
     color-scheme:
       description: 更改舞台的配色方案

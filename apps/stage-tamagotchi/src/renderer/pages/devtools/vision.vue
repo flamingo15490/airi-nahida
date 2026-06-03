@@ -1,24 +1,21 @@
 <script setup lang="ts">
-import type { VisionWorkloadId } from '@proj-airi/stage-ui/composables'
-import type { SourcesOptions } from 'electron'
-
-import { errorMessageFrom } from '@moeru/std'
 import { ProcessingMeter } from '@proj-airi/stage-ui/components'
 import { VISION_WORKLOADS } from '@proj-airi/stage-ui/composables'
 import { useVisionOrchestratorStore, useVisionProcessingStore, useVisionStore } from '@proj-airi/stage-ui/stores/modules/vision'
 import { Button, FieldCheckbox, FieldCombobox, FieldRange, SelectTab } from '@proj-airi/ui'
 import { storeToRefs } from 'pinia'
-import { computed, onBeforeUnmount, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 
 import WithScreenCapture from '../../components/WithScreenCapture.vue'
 
-import { useVisionScreenCapture } from '../../composables/use-vision-screen-capture'
+import { useVisionRunner } from '../../composables/use-vision-runner'
 
 type SourceCategory = 'applications' | 'displays'
 
 const visionStore = useVisionStore()
 const visionProcessingStore = useVisionProcessingStore()
 const visionOrchestratorStore = useVisionOrchestratorStore()
+const visionRunner = useVisionRunner()
 const { activeModel } = storeToRefs(visionStore)
 const {
   captureIntervalMs,
@@ -37,33 +34,28 @@ const {
   lastError,
 } = storeToRefs(visionOrchestratorStore)
 
-const sourcesOptions = ref<SourcesOptions>({
-  types: ['screen', 'window'],
-  fetchWindowIcons: true,
-})
-
 const sourceCategory = ref<SourceCategory>('displays')
-const errorMessage = ref('')
-const screenshotDataUrl = ref('')
-const sendContextUpdates = ref(false)
-const captureDownscalePercent = ref(100)
-const selectedWorkload = ref<VisionWorkloadId>(VISION_WORKLOADS[0]?.id || 'screen:interpret')
-
-const videoRef = ref<HTMLVideoElement | null>(null)
-
 const {
+  sourcesOptions,
   sources,
   activeSourceId,
   activeSource,
   activeStream,
   isRefetching,
   hasFetchedOnce,
+  errorMessage,
+  screenshotDataUrl,
+  sendContextUpdates,
+  captureDownscalePercent,
+  selectedWorkload,
+  captureInputBounds,
   refetchSources,
-  startStream,
-  stopStream,
-  cleanup,
-  captureFrame,
-} = useVisionScreenCapture(sourcesOptions)
+  startCaptureLoop,
+  stopCaptureLoop,
+  initializeSources,
+  refreshPermissions,
+  selectSource,
+} = visionRunner
 
 const categoryOptions = [
   { label: 'Applications', value: 'applications', icon: 'i-solar:window-frame-line-duotone' },
@@ -103,15 +95,6 @@ const statusLabel = computed(() => {
 
 const isInitialLoading = computed(() => !hasFetchedOnce.value && isRefetching.value)
 const refetchLabel = computed(() => (isInitialLoading.value ? 'Loading...' : isRefetching.value ? 'Refetching...' : 'Refetch'))
-const captureInputBounds = computed(() => {
-  const scaleRatio = captureDownscalePercent.value / 100
-
-  return {
-    maxWidth: Math.max(160, Math.round(1280 * scaleRatio)),
-    maxHeight: Math.max(90, Math.round(720 * scaleRatio)),
-  }
-})
-
 const processingMaxMs = computed(() => {
   if (!processingHistoryMs.value.length)
     return 500
@@ -123,143 +106,22 @@ const expectedRateMax = computed(() => {
   return Math.max(60, Math.ceil(60000 / interval))
 })
 
-function hasLiveVideoStream(stream: MediaStream | null) {
-  if (!stream)
-    return false
-
-  return stream.getVideoTracks().some(track => track.readyState === 'live')
-}
-
-async function ensureVideoStream() {
-  if (!activeSourceId.value)
-    return
-
-  const stream = await startStream()
-  const video = videoRef.value
-  if (!video)
-    return
-
-  video.srcObject = stream
-  await video.play()
-
-  await new Promise<void>((resolve) => {
-    if (video.readyState >= 2) {
-      resolve()
-      return
-    }
-
-    const handleLoadedMetadata = () => {
-      video.removeEventListener('loadedmetadata', handleLoadedMetadata)
-      resolve()
-    }
-
-    video.addEventListener('loadedmetadata', handleLoadedMetadata)
-  })
-}
-
-async function handleVisionTick() {
-  if (!activeSourceId.value)
-    return
-
-  try {
-    if (!hasLiveVideoStream(activeStream.value)) {
-      stopStream()
-      await ensureVideoStream()
-    }
-
-    const video = videoRef.value
-    if (!video)
-      return
-
-    const dataUrl = captureFrame(
-      video,
-      0.82,
-      captureInputBounds.value.maxWidth,
-      captureInputBounds.value.maxHeight,
-    )
-    if (!dataUrl)
-      return
-
-    screenshotDataUrl.value = dataUrl
-    const capturedAt = Date.now()
-
-    const result = await visionOrchestratorStore.processCapture({
-      imageDataUrl: dataUrl,
-      workloadId: selectedWorkload.value,
-      sourceId: activeSourceId.value,
-      capturedAt,
-      publishContext: sendContextUpdates.value,
-    })
-
-    return { capturedAt, contextUpdates: result.contextUpdates }
-  }
-  catch (error) {
-    visionOrchestratorStore.recordError(error)
-    errorMessage.value = `Failed to interpret frame: ${errorMessageFrom(error)}`
-    return { capturedAt: Date.now(), contextUpdates: 0 }
-  }
-}
-
-async function startCaptureLoop() {
-  errorMessage.value = ''
-  if (!activeSourceId.value) {
-    errorMessage.value = 'Select a source before starting the ticker.'
-    return
-  }
-
-  try {
-    await ensureVideoStream()
-  }
-  catch (error) {
-    errorMessage.value = `Failed to start stream: ${errorMessageFrom(error)}`
-    return
-  }
-
-  visionProcessingStore.startTicker(handleVisionTick)
-}
-
-async function stopCaptureLoop() {
-  visionProcessingStore.stopTicker()
-  stopStream()
-  if (videoRef.value) {
-    videoRef.value.pause()
-    videoRef.value.srcObject = null
-  }
-}
-
 function stopActiveCapture() {
   void stopCaptureLoop()
 }
 
-function selectSource(sourceId: string) {
-  activeSourceId.value = sourceId
-  if (isRunning.value) {
-    void ensureVideoStream().catch((error) => {
-      errorMessage.value = `Failed to start stream: ${errorMessageFrom(error)}`
-    })
-  }
-}
-
-async function shareSource(sourceId: string) {
+function shareSource(sourceId: string) {
   errorMessage.value = ''
-  activeSourceId.value = sourceId
-
-  try {
-    await ensureVideoStream()
-  }
-  catch (error) {
-    errorMessage.value = `Failed to start stream: ${errorMessageFrom(error)}`
-  }
+  selectSource(sourceId)
 }
 
 function handlePermissionGranted() {
-  void refetchSources()
+  void refreshPermissions()
+  void initializeSources()
 }
 
-onBeforeUnmount(() => {
-  visionProcessingStore.stopTicker()
-  stopStream()
-  cleanup()
+onMounted(() => {
+  void initializeSources()
 })
 </script>
 
@@ -607,8 +469,6 @@ onBeforeUnmount(() => {
             </div>
           </div>
         </div>
-
-        <video ref="videoRef" :class="['hidden']" />
       </div>
 
       <div

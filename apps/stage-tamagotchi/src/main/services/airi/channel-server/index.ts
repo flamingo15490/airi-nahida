@@ -57,6 +57,24 @@ const channelServerConfigStore = createConfig('server-channel', 'config.json', c
 let serverChannelServiceRegistered = false
 let serverChannelCertificateTrustConfigured = false
 
+export interface ServerChannelModuleSnapshot {
+  name: string
+  index?: number
+  identity: {
+    kind: string
+    plugin?: {
+      id?: string
+    }
+  }
+  authenticated: boolean
+  healthy: boolean
+  lastHeartbeatAt?: number
+}
+
+export interface DesktopServerChannel extends Server {
+  getModuleSnapshot: () => ServerChannelModuleSnapshot[]
+}
+
 interface ServerChannelCertificateVerifyRequest {
   hostname: string
   verificationResult: string
@@ -354,7 +372,7 @@ async function getOrCreateCertificate() {
   return { cert: withCertificateChain(cert, caCert), key }
 }
 
-export async function setupServerChannel(params: { lifecycle: Lifecycle }): Promise<Server> {
+export async function setupServerChannel(params: { lifecycle: Lifecycle }): Promise<DesktopServerChannel> {
   channelServerConfigStore.setup()
   configureServerChannelCertificateTrust()
 
@@ -404,9 +422,16 @@ export async function setupServerChannel(params: { lifecycle: Lifecycle }): Prom
     }
   })
 
+  const runtimeServerChannel = serverChannel as Server & {
+    getModuleSnapshot?: () => ServerChannelModuleSnapshot[]
+  }
+
   return {
     getConnectionHost() {
       return serverChannel.getConnectionHost()
+    },
+    getModuleSnapshot() {
+      return runtimeServerChannel.getModuleSnapshot?.() ?? []
     },
     async start() {
       const release = await mutex.acquire()
@@ -448,7 +473,7 @@ export async function setupServerChannel(params: { lifecycle: Lifecycle }): Prom
   }
 }
 
-export async function createServerChannelService(params: { serverChannel: Server }) {
+export async function createServerChannelService(params: { serverChannel: DesktopServerChannel }) {
   if (serverChannelServiceRegistered) {
     return
   }
@@ -506,4 +531,4 @@ export async function createServerChannelService(params: { serverChannel: Server
   })
 }
 
-export type { Server as ServerChannel }
+export type { DesktopServerChannel as ServerChannel }
