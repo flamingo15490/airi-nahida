@@ -87,13 +87,16 @@ For PR #1 acceptance, a dedicated acceptance worktree / launcher path is also us
 
 ## Related Docs
 
-- [已实现功能.md](./已实现功能.md)
-- [00-项目总目标.md](./00-项目总目标.md)
-- [04-最终愿景与阶段路线图.md](./04-最终愿景与阶段路线图.md)
-- [05-工作交接记录.md](./05-工作交接记录.md)
+- [Project docs index](./project-docs/README.md)
+- [Implemented features](./project-docs/已实现功能.md)
+- [Project goal](./project-docs/00-项目总目标.md)
+- [Roadmap](./project-docs/04-最终愿景与阶段路线图.md)
+- [Handoff record](./project-docs/05-工作交接记录.md)
+- [Phase closure](./project-docs/06-阶段收尾结论.md)
 
 ## Notes
 
+- Project documentation is centralized under [project-docs](./project-docs/README.md).
 - Upstream AIRI remains the original foundation of this work.
 - This repository intentionally follows a conservative staged-integration path.
 - Large architectural rewrites are not the current priority.
