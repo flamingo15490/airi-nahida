@@ -51,13 +51,28 @@ Implemented and already integrated into the source tree:
 - Legacy local data and file-origin storage restoration support
 - Desktop-only external integration settings layer
 - External memory read / supplement / controlled write-back flow
-- Nahida persona layer with adjustable modes
-- Proactive companion governance layer with event history and cooldown control
+- Nahida persona layer with clearer structured boundaries
+- Proactive companion governance layer with event history, cooldown control, and explainable decisions
 
-See also:
-- [已实现功能.md](./已实现功能.md)
-- [00-项目总目标.md](./00-项目总目标.md)
-- [04-最终愿景与阶段路线图.md](./04-最终愿景与阶段路线图.md)
+## Current Status
+
+The main body of the first five custom stages is now in place:
+- source stabilization
+- local integration stabilization
+- Nahida persona layer
+- external memory loop
+- proactive companion governance
+
+At this point, the repository is no longer just a loose patch stack. It already has a clearer custom baseline for future iteration.
+
+## What Is Still Intentionally Out Of Scope
+
+This repository still does not try to:
+- fully internalize GPT-SoVITS into AIRI
+- fully internalize ComfyUI / image workflows
+- rewrite sidecar into AIRI core
+- replace `D:\AIRI-Memory` with an internal memory engine
+- turn the project into a general multi-character persona platform
 
 ## Local Startup
 
@@ -68,18 +83,18 @@ Typical workflow:
 - Reuse existing local AIRI data where appropriate
 - Keep memory, sidecar, TTS, and image-generation services external unless a later stage explicitly changes that
 
-## Status
+For PR #1 acceptance, a dedicated acceptance worktree / launcher path is also used to avoid contaminating the normal source-preview workflow.
 
-This project is currently in an iterative custom-development phase.
+## Related Docs
 
-The short-term goal is not to turn everything into built-in AIRI modules immediately, but to make the current local companion stack:
-- more stable
-- easier to verify
-- easier to maintain
-- easier to extend in later stages
+- [已实现功能.md](./已实现功能.md)
+- [00-项目总目标.md](./00-项目总目标.md)
+- [04-最终愿景与阶段路线图.md](./04-最终愿景与阶段路线图.md)
+- [05-工作交接记录.md](./05-工作交接记录.md)
 
 ## Notes
 
 - Upstream AIRI remains the original foundation of this work.
-- This repository intentionally follows a conservative, staged integration path.
+- This repository intentionally follows a conservative staged-integration path.
 - Large architectural rewrites are not the current priority.
+- The next natural step is to deepen the cooperation quality between memory, persona, and proactive companion behavior rather than expanding infrastructure blindly.
