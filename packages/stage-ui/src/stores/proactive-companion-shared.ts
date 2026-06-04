@@ -157,9 +157,9 @@ export function createDefaultProactiveCompanionRuntimeSnapshot(): ProactiveCompa
   return {
     settings: createDefaultProactiveCompanionSettings(),
     state: 'unavailable',
-    summary: 'Proactive companion governance is not available in this runtime.',
+    summary: '主动陪伴当前运行时暂不可用。',
     sidecarConnected: false,
-    sidecarSummary: 'Companion sidecar status is unavailable.',
+    sidecarSummary: 'sidecar 状态暂不可用。',
     recentDecisions: [],
     refreshedAt: Date.now(),
   }

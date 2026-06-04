@@ -390,7 +390,7 @@ function buildTurnSnapshot(params: {
       let decisionType: ExternalMemoryEvidenceSnapshot['decisionType'] = 'suppressed-empty'
       let reason = createEvidenceReason({
         code: 'layer-empty',
-        detail: 'Suppressed because the item did not contain meaningful JSON-safe content after normalization.',
+        detail: '已压制：该条目在规范化后没有保留有意义的 JSON-safe 内容。',
       })
       let suppressedByEvidenceId: string | undefined
 
@@ -398,21 +398,21 @@ function buildTurnSnapshot(params: {
         decisionType = 'suppressed-empty'
         reason = createEvidenceReason({
           code: 'layer-empty',
-          detail: 'Suppressed because the item did not contain meaningful JSON-safe content after normalization.',
+          detail: '已压制：该条目在规范化后没有保留有意义的 JSON-safe 内容。',
         })
       }
       else if (document.kind === 'follow-ups' && !isActionableFollowUpLine(item)) {
         decisionType = 'suppressed-not-actionable'
         reason = createEvidenceReason({
           code: 'layer-empty',
-          detail: 'Suppressed because follow-up memory only accepts explicit action or reminder content.',
+          detail: '已压制：待跟进记忆只接受明确的动作或提醒内容。',
         })
       }
       else if (document.kind === 'character-knowledge' && !params.matchedCharacterKnowledge) {
         decisionType = 'suppressed-character-mismatch'
         reason = createEvidenceReason({
           code: 'layer-empty',
-          detail: 'Suppressed because character knowledge only participates when the current character matches.',
+          detail: '已压制：角色知识库只会在当前角色命中时参与。',
         })
       }
       else {
@@ -429,8 +429,8 @@ function buildTurnSnapshot(params: {
           reason = createEvidenceReason({
             code: 'layer-empty',
             detail: duplicate.layer === document.layer
-              ? 'Suppressed because an equivalent item was already selected from the same layer.'
-              : 'Suppressed because a higher-priority layer already established the same content.',
+              ? '已压制：同一层中已有等价条目被选中。'
+              : '已压制：更高优先级的层已经确定了相同内容。',
           })
           suppressedByEvidenceId = duplicate.id
         }
@@ -438,7 +438,7 @@ function buildTurnSnapshot(params: {
           decisionType = 'suppressed-lower-priority'
           reason = createEvidenceReason({
             code: 'layer-empty',
-            detail: 'Suppressed because stable profile or preference evidence overrides lower-priority recent context.',
+            detail: '已压制：稳定用户信息或稳定偏好设置会覆盖更低优先级的近期上下文。',
           })
           suppressedByEvidenceId = stableConflict.id
         }
@@ -447,7 +447,7 @@ function buildTurnSnapshot(params: {
           decisionType = 'selected'
           reason = createEvidenceReason({
             code: 'layer-selected',
-            detail: 'Selected for the latest turn snapshot after layering and normalization.',
+            detail: '已选中：该条目在分层与规范化后进入了最近一次记忆快照。',
           })
         }
       }
@@ -636,7 +636,7 @@ async function readStructuredDocument(kind: ExternalMemoryDocumentKind, path: st
         kind,
         path,
         available: false,
-        summary: 'Document is missing.',
+        summary: '记忆文档缺失。',
       })
     }
 
@@ -650,7 +650,7 @@ async function readStructuredDocument(kind: ExternalMemoryDocumentKind, path: st
       kind,
       path,
       available: true,
-      summary: items.length > 0 ? 'Document loaded.' : 'Document is empty.',
+      summary: items.length > 0 ? '记忆文档已加载。' : '记忆文档为空。',
       items,
     })
   }
@@ -659,7 +659,7 @@ async function readStructuredDocument(kind: ExternalMemoryDocumentKind, path: st
       kind,
       path,
       available: false,
-      summary: 'Failed to read document.',
+      summary: '读取记忆文档失败。',
       error: errorMessageFrom(error) ?? 'Unknown error',
     })
   }
@@ -676,7 +676,7 @@ async function readCharacterKnowledge(rootPath: string, characterName?: string):
           kind: 'character-knowledge',
           path: knowledgeDirectoryPath,
           available: false,
-          summary: 'Character knowledge directory is missing.',
+          summary: '角色知识库目录缺失。',
         }),
       }
     }
@@ -695,7 +695,7 @@ async function readCharacterKnowledge(rootPath: string, characterName?: string):
           kind: 'character-knowledge',
           path: knowledgeDirectoryPath,
           available: true,
-          summary: 'Character knowledge directory is available, but the current character did not match any knowledge files.',
+          summary: '角色知识库目录可用，但当前角色未命中任何知识文件。',
         }),
       }
     }
@@ -730,8 +730,8 @@ async function readCharacterKnowledge(rootPath: string, characterName?: string):
         path: knowledgeDirectoryPath,
         available: true,
         summary: collectedItems.length > 0
-          ? 'Selected lightweight character knowledge snippets for the active character.'
-          : 'Character knowledge files were available but produced no usable snippets.',
+          ? '已为当前角色选取轻量角色知识片段。'
+          : '角色知识文件可用，但没有提取到可用片段。',
         items: collectedItems.slice(0, maxStructuredItemsPerDocument),
       }),
     }
@@ -743,7 +743,7 @@ async function readCharacterKnowledge(rootPath: string, characterName?: string):
         kind: 'character-knowledge',
         path: knowledgeDirectoryPath,
         available: false,
-        summary: 'Failed to read character knowledge.',
+        summary: '读取角色知识失败。',
         error: errorMessageFrom(error) ?? 'Unknown error',
       }),
     }
@@ -771,8 +771,15 @@ function summarizeCandidate(kind: ExternalMemoryDocumentKind, decisions: Externa
   const selectedAdds = decisions.filter(item => item.action === 'add' && item.selected).length
   const selectedRemovals = decisions.filter(item => item.action === 'remove' && item.selected).length
   const suppressed = decisions.filter(item => !item.selected).length
+  const kindLabel = {
+    'user-profile': '用户信息',
+    'preferences': '偏好设置',
+    'follow-ups': '待跟进',
+    'recent-summary': '近期摘要',
+    'character-knowledge': '角色知识库',
+  } satisfies Record<ExternalMemoryDocumentKind, string>
 
-  return `Reviewed ${selectedAdds} addition(s), ${selectedRemovals} removal(s), and ${suppressed} suppressed item(s) for ${kind}.`
+  return `已评审${kindLabel[kind]}：${selectedAdds} 条新增、${selectedRemovals} 条移除、${suppressed} 条已压制。`
 }
 
 function appendBulletLines(existingText: string, items: string[]) {
@@ -925,14 +932,14 @@ export function createExternalMemoryManager(params: {
     if (!snapshot || snapshot.config.kind !== 'memory') {
       return {
         state: 'unavailable',
-        summary: 'Memory integration is not configured.',
+        summary: '未配置记忆集成。',
       }
     }
 
     if (!snapshot.config.enabled) {
       return {
         state: 'disabled',
-        summary: 'Memory integration is disabled.',
+        summary: '记忆集成已禁用。',
       }
     }
 
@@ -942,14 +949,14 @@ export function createExternalMemoryManager(params: {
       if (!rootStat.isDirectory()) {
         return {
           state: 'degraded',
-          summary: 'Memory root path is not a directory.',
+          summary: '记忆根目录路径不是文件夹。',
         }
       }
     }
     catch {
       return {
         state: 'degraded',
-        summary: 'Memory root path is unavailable.',
+        summary: '记忆根目录路径不可用。',
       }
     }
 
@@ -1002,8 +1009,8 @@ export function createExternalMemoryManager(params: {
 
     const readAt = Date.now()
     const preliminarySummary = documents.some(document => document.items.length > 0)
-      ? `Loaded trusted external memory from ${documents.filter(document => document.items.length > 0).length} document group(s).`
-      : 'External memory root is reachable, but no usable memory snippets were found.'
+      ? `已从 ${documents.filter(document => document.items.length > 0).length} 组文档加载可信记忆。`
+      : '记忆根目录可访问，但未找到可用的记忆片段。'
     const turn = buildTurnSnapshot({
       readAt,
       characterName,
@@ -1015,8 +1022,8 @@ export function createExternalMemoryManager(params: {
     const usedKinds = Array.from(new Set(turn.evidence.filter(item => item.selected).map(item => item.kind)))
     const usedLayers = [...turn.usedLayers]
     const summary = usedKinds.length > 0
-      ? `Loaded trusted external memory from ${usedKinds.length} selected document group(s).`
-      : 'External memory root is reachable, but all candidate memory snippets were suppressed by layering rules.'
+      ? `已从 ${usedKinds.length} 组选中文档加载可信记忆。`
+      : '记忆根目录可访问，但所有记忆候选都被分层规则压制了。'
     const normalizedTurn: ExternalMemoryTurnSnapshot = {
       ...turn,
       summary,
@@ -1083,7 +1090,7 @@ export function createExternalMemoryManager(params: {
       let selected = false
       let decision = createCandidateDecision({
         type: 'suppressed-empty',
-        detail: 'Suppressed because the candidate did not contain meaningful normalized content.',
+        detail: '已压制：该记忆候选没有有意义的规范化内容。',
       })
       let occurrenceCount = 0
       let matchedExistingText: string | undefined
@@ -1091,13 +1098,13 @@ export function createExternalMemoryManager(params: {
       if (!normalizedText) {
         decision = createCandidateDecision({
           type: 'suppressed-empty',
-          detail: 'Suppressed because the candidate did not contain meaningful normalized content.',
+          detail: '已压制：该记忆候选没有有意义的规范化内容。',
         })
       }
       else if (seenNormalized.has(normalizedText)) {
         decision = createCandidateDecision({
           type: 'suppressed-duplicate',
-          detail: 'Suppressed because an equivalent candidate already appeared in this batch.',
+          detail: '已压制：这一批次中已经出现了等价的记忆候选。',
         })
       }
       else {
@@ -1110,34 +1117,34 @@ export function createExternalMemoryManager(params: {
         if (duplicate) {
           decision = createCandidateDecision({
             type: 'suppressed-duplicate',
-            detail: 'Suppressed because equivalent content already exists in the stored stable memory.',
+            detail: '已压制：稳定记忆中已经存在等价内容。',
           })
           matchedExistingText = duplicate.original
         }
         else if (params.kind === 'preferences' && temporaryPreferencePattern.test(item)) {
           decision = createCandidateDecision({
             type: 'suppressed-not-stable',
-            detail: 'Suppressed because temporary preference signals are not stable enough for automatic write-back.',
+            detail: '已压制：临时性的偏好信号还不够稳定，不能自动写回。',
           })
         }
         else if (conflictingItem && conflictingItem.normalized !== normalizedText) {
           decision = createCandidateDecision({
             type: 'suppressed-conflict',
-            detail: 'Suppressed because stronger existing stable memory already records a conflicting normalized fact.',
+            detail: '已压制：更强的既有稳定记忆已经记录了冲突的规范化事实。',
           })
           matchedExistingText = conflictingItem.original
         }
         else if (isWeakStableSignal(item) && occurrenceCount < 2) {
           decision = createCandidateDecision({
             type: 'suppressed-needs-repeat',
-            detail: 'Suppressed because weak stable signals must appear at least twice before automatic write-back.',
+            detail: '已压制：较弱的稳定信号至少需要重复出现两次后才会自动写回。',
           })
         }
         else {
           selected = true
           decision = createCandidateDecision({
             type: 'selected',
-            detail: 'Selected for stable-memory write-back after normalization and repeat/conflict review.',
+            detail: '已选中：该记忆候选已通过规范化、重复出现与冲突检查，可写回稳定记忆。',
           })
           selectedAddItems.push(item)
         }
@@ -1165,11 +1172,11 @@ export function createExternalMemoryManager(params: {
       reason: selectedAddItems.length > 0
         ? createCandidateReason({
             code: 'write-written',
-            detail: 'At least one stable-memory candidate was selected for persistence.',
+            detail: '至少有一条稳定记忆候选被选中并准备落盘。',
           })
         : decisions[0]?.reason ?? createCandidateReason({
           code: 'write-skipped-empty',
-          detail: 'No stable-memory candidate remained after normalization.',
+          detail: '规范化后没有留下可写回的稳定记忆候选。',
         }),
       addItems: selectedAddItems,
       removeItems: [],
@@ -1201,32 +1208,32 @@ export function createExternalMemoryManager(params: {
       let selected = false
       let decision = createCandidateDecision({
         type: 'suppressed-empty',
-        detail: 'Suppressed because the follow-up candidate did not contain meaningful normalized content.',
+        detail: '已压制：该待跟进候选没有有意义的规范化内容。',
       })
       let matchedExistingText: string | undefined
 
       if (!normalizedText) {
         decision = createCandidateDecision({
           type: 'suppressed-empty',
-          detail: 'Suppressed because the follow-up candidate did not contain meaningful normalized content.',
+          detail: '已压制：该待跟进候选没有有意义的规范化内容。',
         })
       }
       else if (seenAdds.has(normalizedText)) {
         decision = createCandidateDecision({
           type: 'suppressed-duplicate',
-          detail: 'Suppressed because an equivalent follow-up candidate already appeared in this batch.',
+          detail: '已压制：这一批次中已经出现了等价的待跟进候选。',
         })
       }
       else if (!isActionableFollowUpLine(item)) {
         decision = createCandidateDecision({
           type: 'suppressed-not-actionable',
-          detail: 'Suppressed because follow-up memory only accepts explicit action or reminder content.',
+          detail: '已压制：待跟进记忆只接受明确的动作或提醒内容。',
         })
       }
       else if (existingMap.has(normalizedText)) {
         decision = createCandidateDecision({
           type: 'suppressed-duplicate',
-          detail: 'Suppressed because the same actionable follow-up already exists.',
+          detail: '已压制：相同的动作型待跟进已经存在。',
         })
         matchedExistingText = existingMap.get(normalizedText)?.original
       }
@@ -1235,7 +1242,7 @@ export function createExternalMemoryManager(params: {
         selected = true
         decision = createCandidateDecision({
           type: 'selected',
-          detail: 'Selected because the candidate is an explicit actionable follow-up.',
+          detail: '已选中：该候选是明确的动作型待跟进。',
         })
         selectedAddItems.push(item)
       }
@@ -1259,25 +1266,25 @@ export function createExternalMemoryManager(params: {
       let selected = false
       let decision = createCandidateDecision({
         type: 'suppressed-empty',
-        detail: 'Suppressed because the follow-up removal candidate did not contain meaningful normalized content.',
+        detail: '已压制：该待跟进移除候选没有有意义的规范化内容。',
       })
 
       if (!normalizedText) {
         decision = createCandidateDecision({
           type: 'suppressed-empty',
-          detail: 'Suppressed because the follow-up removal candidate did not contain meaningful normalized content.',
+          detail: '已压制：该待跟进移除候选没有有意义的规范化内容。',
         })
       }
       else if (seenRemovals.has(normalizedText)) {
         decision = createCandidateDecision({
           type: 'suppressed-duplicate',
-          detail: 'Suppressed because an equivalent follow-up removal already appeared in this batch.',
+          detail: '已压制：这一批次中已经出现了等价的待跟进移除候选。',
         })
       }
       else if (!existing) {
         decision = createCandidateDecision({
           type: 'removal-suppressed-missing',
-          detail: 'Suppressed because no matching stored follow-up item was found to remove.',
+          detail: '已压制：没有找到可移除的匹配待跟进条目。',
         })
       }
       else {
@@ -1285,7 +1292,7 @@ export function createExternalMemoryManager(params: {
         selected = true
         decision = createCandidateDecision({
           type: 'removal-selected',
-          detail: 'Selected because a matching stored follow-up item was found and can be removed.',
+          detail: '已选中：已找到匹配的待跟进条目，可执行移除。',
         })
         selectedRemoveItems.push(item)
         removedOriginalItems.push(existing.original)
@@ -1313,11 +1320,11 @@ export function createExternalMemoryManager(params: {
       reason: selectedAddItems.length > 0 || selectedRemoveItems.length > 0
         ? createCandidateReason({
             code: 'write-written',
-            detail: 'At least one follow-up add/remove candidate was selected for persistence.',
+            detail: '至少有一条待跟进新增或移除候选被选中并准备落盘。',
           })
         : decisions[0]?.reason ?? createCandidateReason({
           code: 'write-skipped-empty',
-          detail: 'No follow-up candidate remained after review.',
+          detail: '评审后没有留下可写回的待跟进候选。',
         }),
       addItems: selectedAddItems,
       removeItems: selectedRemoveItems,
@@ -1349,26 +1356,26 @@ export function createExternalMemoryManager(params: {
       let selected = false
       let decision = createCandidateDecision({
         type: 'suppressed-empty',
-        detail: 'Suppressed because the recent-summary body line did not contain meaningful normalized content.',
+        detail: '已压制：该近期摘要正文行没有有意义的规范化内容。',
       })
 
       if (!normalizedText) {
         decision = createCandidateDecision({
           type: 'suppressed-empty',
-          detail: 'Suppressed because the recent-summary body line did not contain meaningful normalized content.',
+          detail: '已压制：该近期摘要正文行没有有意义的规范化内容。',
         })
       }
       else if (seenNormalized.has(normalizedText)) {
         decision = createCandidateDecision({
           type: 'suppressed-duplicate',
-          detail: 'Suppressed because an equivalent body line already appeared in this candidate batch.',
+          detail: '已压制：这一批次中已经出现了等价的正文行。',
         })
       }
       else if (previousMap.has(normalizedText)) {
         seenNormalized.add(normalizedText)
         decision = createCandidateDecision({
           type: 'suppressed-no-new-content',
-          detail: 'Suppressed because the stored recent-summary body already contains the same substantive line.',
+          detail: '已压制：已存储的近期摘要正文中已经包含相同的实质内容。',
         })
       }
       else {
@@ -1376,7 +1383,7 @@ export function createExternalMemoryManager(params: {
         selected = true
         decision = createCandidateDecision({
           type: 'selected',
-          detail: 'Selected because this body line adds substantive new recent-summary content.',
+          detail: '已选中：这一正文行补充了新的近期摘要实质内容。',
         })
         hasNewBodyContent = true
       }
@@ -1402,11 +1409,11 @@ export function createExternalMemoryManager(params: {
       reason: hasNewBodyContent
         ? createCandidateReason({
             code: 'write-written',
-            detail: 'Recent-summary review found substantive new body content to persist.',
+            detail: '近期摘要评审发现了可写回的新增实质内容。',
           })
         : decisions[0]?.reason ?? createCandidateReason({
           code: 'write-skipped-empty',
-          detail: 'Recent-summary review did not find any substantive new body content.',
+          detail: '近期摘要评审没有发现新的实质内容。',
         }),
       addItems: decisions.filter(item => item.selected && item.action === 'add').map(item => item.text),
       removeItems: [],
@@ -1445,7 +1452,7 @@ export function createExternalMemoryManager(params: {
         changed: false,
         decision: 'skipped-unavailable',
         reason: review.reason,
-        summary: 'Recent summary write skipped because the memory root is unavailable.',
+        summary: '近期摘要写回已跳过：记忆根目录不可用。',
         writtenAt,
         error: resolvedRoot.summary,
         review,
@@ -1468,7 +1475,7 @@ export function createExternalMemoryManager(params: {
         changed: false,
         decision: 'skipped-empty',
         reason: review.reason,
-        summary: 'Recent summary write skipped because no usable summary body was provided.',
+        summary: '近期摘要写回已跳过：没有提供可用的摘要正文。',
         writtenAt,
         path,
         review,
@@ -1491,7 +1498,7 @@ export function createExternalMemoryManager(params: {
         changed: false,
         decision: 'skipped-duplicate',
         reason: review.reason,
-        summary: 'Recent summary already covered the same body content, so no write was needed.',
+        summary: '近期摘要已覆盖相同正文内容，因此无需写回。',
         writtenAt,
         path,
         review,
@@ -1514,7 +1521,7 @@ export function createExternalMemoryManager(params: {
       changed: true,
       decision: 'written',
       reason: review.reason,
-      summary: 'Recent summary updated with new body content.',
+      summary: '近期摘要已更新为新的正文内容。',
       writtenAt,
       path,
       added: reviewed.candidate.addItems,
@@ -1550,7 +1557,7 @@ export function createExternalMemoryManager(params: {
         changed: false,
         decision: 'skipped-unavailable',
         reason: review.reason,
-        summary: 'Follow-up write skipped because the memory root is unavailable.',
+        summary: '待跟进写回已跳过：记忆根目录不可用。',
         writtenAt,
         error: resolvedRoot.summary,
         review,
@@ -1575,8 +1582,8 @@ export function createExternalMemoryManager(params: {
         decision,
         reason: review.reason,
         summary: decision === 'skipped-duplicate'
-          ? 'Follow-up items already matched the stored list.'
-          : 'Follow-up write skipped because no actionable change remained after review.',
+          ? '待跟进条目已与存储列表一致。'
+          : '待跟进写回已跳过：评审后没有留下可执行的变更。',
         writtenAt,
         path,
         review,
@@ -1602,7 +1609,7 @@ export function createExternalMemoryManager(params: {
       changed: merged.changed,
       decision: review.decision,
       reason: review.reason,
-      summary: merged.changed ? 'Follow-up items updated.' : 'No follow-up changes were needed after review.',
+      summary: merged.changed ? '待跟进条目已更新。' : '评审后无需更新待跟进条目。',
       writtenAt,
       path,
       added: reviewed.selectedAddItems,
@@ -1639,7 +1646,7 @@ export function createExternalMemoryManager(params: {
         changed: false,
         decision: 'skipped-unavailable',
         reason: review.reason,
-        summary: 'User profile write skipped because the memory root is unavailable.',
+        summary: '用户信息写回已跳过：记忆根目录不可用。',
         writtenAt,
         error: resolvedRoot.summary,
         review,
@@ -1664,8 +1671,8 @@ export function createExternalMemoryManager(params: {
         decision,
         reason: review.reason,
         summary: decision === 'skipped-duplicate'
-          ? 'No new user profile facts were detected.'
-          : 'User profile write skipped because the reviewed facts were not stable enough yet.',
+          ? '未检测到新的用户信息事实。'
+          : '用户信息写回已跳过：评审后的事实还不够稳定。',
         writtenAt,
         path,
         review,
@@ -1691,7 +1698,7 @@ export function createExternalMemoryManager(params: {
       changed: merged.changed,
       decision: review.decision,
       reason: review.reason,
-      summary: merged.changed ? 'User profile updated.' : 'No new user profile facts were detected.',
+      summary: merged.changed ? '用户信息已更新。' : '未检测到新的用户信息事实。',
       writtenAt,
       path,
       added: reviewed.selectedAddItems,
@@ -1727,7 +1734,7 @@ export function createExternalMemoryManager(params: {
         changed: false,
         decision: 'skipped-unavailable',
         reason: review.reason,
-        summary: 'Preference write skipped because the memory root is unavailable.',
+        summary: '偏好设置写回已跳过：记忆根目录不可用。',
         writtenAt,
         error: resolvedRoot.summary,
         review,
@@ -1752,8 +1759,8 @@ export function createExternalMemoryManager(params: {
         decision,
         reason: review.reason,
         summary: decision === 'skipped-duplicate'
-          ? 'No new preferences were detected.'
-          : 'Preference write skipped because the reviewed preferences were not stable enough yet.',
+          ? '未检测到新的偏好设置。'
+          : '偏好设置写回已跳过：评审后的偏好还不够稳定。',
         writtenAt,
         path,
         review,
@@ -1779,7 +1786,7 @@ export function createExternalMemoryManager(params: {
       changed: merged.changed,
       decision: review.decision,
       reason: review.reason,
-      summary: merged.changed ? 'Preferences updated.' : 'No new preferences were detected.',
+      summary: merged.changed ? '偏好设置已更新。' : '未检测到新的偏好设置。',
       writtenAt,
       path,
       added: reviewed.selectedAddItems,

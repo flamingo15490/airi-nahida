@@ -71,6 +71,26 @@ const decisionToneMap = {
   dropped: 'bg-neutral-500/15 text-neutral-700 dark:text-neutral-300',
 } as const
 
+const decisionLabelMap = {
+  delivered: '已放行',
+  suppressed: '已压制',
+  deferred: '已延后',
+  dropped: '已丢弃',
+} as const
+
+const eventKindLabelMap = {
+  'gentle-check-in': '轻提醒',
+  'reminder': '提醒',
+  'important': '重要提醒',
+  'unknown': '未知类型',
+} as const
+
+const presentationLabelMap = {
+  'light-prompt': '轻提示',
+  'prominent-reminder': '显著提醒',
+  'silent': '静默',
+} as const
+
 function formatTimestamp(value?: number) {
   if (!value) {
     return t('settings.pages.proactive-companion.status.never')
@@ -83,15 +103,29 @@ function formatTimestamp(value?: number) {
 }
 
 function formatSeconds(value: number) {
-  return `${Math.round(value / 1000)}s`
+  return `${Math.round(value / 1000)} 秒`
 }
 
 function formatDestinations(destinations: string[]) {
-  return destinations.length > 0 ? destinations.join(', ') : 'none'
+  if (destinations.length === 0) {
+    return '无'
+  }
+
+  return destinations.map((destination) => {
+    if (destination === 'character') {
+      return '角色'
+    }
+
+    if (destination === 'all') {
+      return '全部'
+    }
+
+    return destination
+  }).join('、')
 }
 
 function formatBoolean(value: boolean) {
-  return value ? 'yes' : 'no'
+  return value ? '是' : '否'
 }
 
 function formatSourceLabel(source: string) {
@@ -99,18 +133,33 @@ function formatSourceLabel(source: string) {
     return source
   }
 
-  return `legacy (${source.slice('legacy:'.length) || 'unknown'})`
+  return `兼容路径（${source.slice('legacy:'.length) || '未知'}）`
+}
+
+function formatDecisionLabel(decision: keyof typeof decisionLabelMap) {
+  return decisionLabelMap[decision]
+}
+
+function formatPresentationLabel(presentation: keyof typeof presentationLabelMap) {
+  return presentationLabelMap[presentation]
+}
+
+function formatEventKindLabel(kind: keyof typeof eventKindLabelMap) {
+  return eventKindLabelMap[kind]
 }
 
 const cooldownStateLabel = computed(() => currentCooldownUntil.value
-  ? 'cooldown active'
-  : 'no active cooldown')
+  ? '冷却中'
+  : '当前无冷却')
 const latestDeliveredAt = computed(() => latestDeliveredDecision.value?.decidedAt)
 const historyEntries = computed(() => history.value.map(decision => ({
   ...decision,
   destinationsLabel: formatDestinations(decision.event.destinations),
   isLegacy: decision.event.source.startsWith('legacy:'),
   sourceLabel: formatSourceLabel(decision.event.source),
+  decisionLabel: formatDecisionLabel(decision.decision),
+  eventKindLabel: formatEventKindLabel(decision.event.kind),
+  presentationLabel: formatPresentationLabel(decision.presentation),
 })))
 
 onMounted(() => {
@@ -197,15 +246,15 @@ onMounted(() => {
           {{ formatTimestamp(runtime.refreshedAt) }}
         </div>
         <div :class="['text-neutral-600', 'dark:text-neutral-300']">
-          <span :class="['font-medium', 'text-neutral-800', 'dark:text-neutral-100']">Latest delivered:</span>
+          <span :class="['font-medium', 'text-neutral-800', 'dark:text-neutral-100']">最近放行：</span>
           {{ formatTimestamp(latestDeliveredAt) }}
         </div>
         <div :class="['text-neutral-600', 'dark:text-neutral-300']">
-          <span :class="['font-medium', 'text-neutral-800', 'dark:text-neutral-100']">Cooldown state:</span>
+          <span :class="['font-medium', 'text-neutral-800', 'dark:text-neutral-100']">冷却状态：</span>
           {{ cooldownStateLabel }}
         </div>
         <div :class="['text-neutral-600', 'dark:text-neutral-300']">
-          <span :class="['font-medium', 'text-neutral-800', 'dark:text-neutral-100']">Cooldown until:</span>
+          <span :class="['font-medium', 'text-neutral-800', 'dark:text-neutral-100']">冷却截止：</span>
           {{ formatTimestamp(currentCooldownUntil) }}
         </div>
         <div :class="['text-neutral-600', 'dark:text-neutral-300', 'md:col-span-2']">
@@ -213,31 +262,31 @@ onMounted(() => {
           {{ runtime.lastFailureReason || t('settings.pages.proactive-companion.status.none') }}
         </div>
         <div :class="['text-neutral-600', 'dark:text-neutral-300', 'md:col-span-2']">
-          <span :class="['font-medium', 'text-neutral-800', 'dark:text-neutral-100']">Latest cooldown reason:</span>
+          <span :class="['font-medium', 'text-neutral-800', 'dark:text-neutral-100']">最近冷却原因：</span>
           {{ latestCooldownDecision?.reason || t('settings.pages.proactive-companion.status.none') }}
         </div>
         <div :class="['text-neutral-600', 'dark:text-neutral-300', 'md:col-span-2']">
-          <span :class="['font-medium', 'text-neutral-800', 'dark:text-neutral-100']">Latest legacy record:</span>
+          <span :class="['font-medium', 'text-neutral-800', 'dark:text-neutral-100']">最近兼容记录：</span>
           {{ latestLegacyDecision?.reason || t('settings.pages.proactive-companion.status.none') }}
         </div>
       </div>
 
       <div :class="['grid', 'gap-2', 'rounded-lg', 'border', 'border-dashed', 'border-neutral-200', 'bg-neutral-50/60', 'p-3', 'text-xs', 'dark:border-neutral-800', 'dark:bg-neutral-950/30', 'md:grid-cols-2']">
         <div :class="['text-neutral-600', 'dark:text-neutral-300']">
-          <span :class="['font-medium', 'text-neutral-800', 'dark:text-neutral-100']">Global cooldown:</span>
+          <span :class="['font-medium', 'text-neutral-800', 'dark:text-neutral-100']">全局冷却：</span>
           {{ formatSeconds(settings.globalCooldownMs) }}
         </div>
         <div :class="['text-neutral-600', 'dark:text-neutral-300']">
-          <span :class="['font-medium', 'text-neutral-800', 'dark:text-neutral-100']">Topic cooldown:</span>
+          <span :class="['font-medium', 'text-neutral-800', 'dark:text-neutral-100']">主题冷却：</span>
           {{ formatSeconds(settings.topicCooldownMs) }}
         </div>
         <div :class="['text-neutral-600', 'dark:text-neutral-300']">
-          <span :class="['font-medium', 'text-neutral-800', 'dark:text-neutral-100']">Intensity:</span>
-          {{ settings.intensity }}
+          <span :class="['font-medium', 'text-neutral-800', 'dark:text-neutral-100']">提醒强度：</span>
+          {{ settings.intensity === 'balanced' ? '平衡' : '低频克制' }}
         </div>
         <div :class="['text-neutral-600', 'dark:text-neutral-300']">
-          <span :class="['font-medium', 'text-neutral-800', 'dark:text-neutral-100']">Current path:</span>
-          low-frequency, reminder-first
+          <span :class="['font-medium', 'text-neutral-800', 'dark:text-neutral-100']">当前路径：</span>
+          低频优先、先提醒后打扰
         </div>
       </div>
 
@@ -265,7 +314,7 @@ onMounted(() => {
           size="sm"
           :disabled="loading || saving || refreshing || clearing"
           :loading="clearing"
-          :label="t('settings.pages.proactive-companion.actions.clear-history')"
+          label="清空历史"
           icon="i-solar:trash-bin-trash-bold-duotone"
           @click="proactiveStore.clearHistory()"
         />
@@ -293,22 +342,22 @@ onMounted(() => {
         </div>
         <div :class="['text-neutral-600', 'dark:text-neutral-300']">
           <span :class="['font-medium', 'text-neutral-800', 'dark:text-neutral-100']">{{ t('settings.pages.proactive-companion.history.latest-presentation') }}:</span>
-          {{ latestDecision.presentation }}
+          {{ formatPresentationLabel(latestDecision.presentation) }}
         </div>
         <div :class="['text-neutral-600', 'dark:text-neutral-300']">
-          <span :class="['font-medium', 'text-neutral-800', 'dark:text-neutral-100']">Latest decision:</span>
-          {{ latestDecision.decision }}
+          <span :class="['font-medium', 'text-neutral-800', 'dark:text-neutral-100']">最近判定：</span>
+          {{ formatDecisionLabel(latestDecision.decision) }}
         </div>
         <div :class="['text-neutral-600', 'dark:text-neutral-300', 'md:col-span-2']">
           <span :class="['font-medium', 'text-neutral-800', 'dark:text-neutral-100']">{{ t('settings.pages.proactive-companion.history.latest-reason') }}:</span>
           {{ latestDecision.reason }}
         </div>
         <div :class="['text-neutral-600', 'dark:text-neutral-300']">
-          <span :class="['font-medium', 'text-neutral-800', 'dark:text-neutral-100']">Latest source:</span>
+          <span :class="['font-medium', 'text-neutral-800', 'dark:text-neutral-100']">最近来源：</span>
           {{ formatSourceLabel(latestDecision.event.source) }}
         </div>
         <div :class="['text-neutral-600', 'dark:text-neutral-300']">
-          <span :class="['font-medium', 'text-neutral-800', 'dark:text-neutral-100']">Latest cooldown until:</span>
+          <span :class="['font-medium', 'text-neutral-800', 'dark:text-neutral-100']">最近冷却截止：</span>
           {{ formatTimestamp(latestDecision.cooldownUntil) }}
         </div>
       </div>
@@ -328,7 +377,7 @@ onMounted(() => {
                 {{ decision.event.headline }}
               </div>
               <div :class="['text-neutral-500', 'dark:text-neutral-400']">
-                {{ decision.sourceLabel }} · {{ decision.event.kind }}
+                {{ decision.sourceLabel }} · {{ decision.eventKindLabel }}
               </div>
             </div>
             <div :class="['flex', 'items-center', 'gap-2']">
@@ -336,7 +385,7 @@ onMounted(() => {
                 v-if="decision.isLegacy"
                 :class="['inline-flex', 'items-center', 'rounded-full', 'bg-slate-500/15', 'px-2', 'py-0.5', 'text-[11px]', 'font-medium', 'text-slate-700', 'dark:text-slate-300']"
               >
-                legacy
+                兼容记录
               </span>
               <span
                 :class="[
@@ -344,7 +393,7 @@ onMounted(() => {
                   decisionToneMap[decision.decision],
                 ]"
               >
-                {{ t(`settings.pages.proactive-companion.history.decisions.${decision.decision}`) }}
+                {{ decision.decisionLabel }}
               </span>
             </div>
           </div>
@@ -359,35 +408,35 @@ onMounted(() => {
               {{ formatTimestamp(decision.decidedAt) }}
             </div>
             <div :class="['text-neutral-600', 'dark:text-neutral-300']">
-              <span :class="['font-medium', 'text-neutral-800', 'dark:text-neutral-100']">Raw kind:</span>
-              {{ decision.event.rawKind || 'none' }}
+              <span :class="['font-medium', 'text-neutral-800', 'dark:text-neutral-100']">原始类型：</span>
+              {{ decision.event.rawKind || '无' }}
             </div>
             <div :class="['text-neutral-600', 'dark:text-neutral-300']">
-              <span :class="['font-medium', 'text-neutral-800', 'dark:text-neutral-100']">Urgency:</span>
-              {{ decision.event.urgency || 'none' }}
+              <span :class="['font-medium', 'text-neutral-800', 'dark:text-neutral-100']">紧急程度：</span>
+              {{ decision.event.urgency || '无' }}
             </div>
             <div :class="['text-neutral-600', 'dark:text-neutral-300']">
-              <span :class="['font-medium', 'text-neutral-800', 'dark:text-neutral-100']">Destinations:</span>
+              <span :class="['font-medium', 'text-neutral-800', 'dark:text-neutral-100']">目标：</span>
               {{ decision.destinationsLabel }}
             </div>
             <div :class="['text-neutral-600', 'dark:text-neutral-300']">
-              <span :class="['font-medium', 'text-neutral-800', 'dark:text-neutral-100']">Presentation:</span>
-              {{ decision.presentation }}
+              <span :class="['font-medium', 'text-neutral-800', 'dark:text-neutral-100']">展示方式：</span>
+              {{ decision.presentationLabel }}
             </div>
             <div :class="['text-neutral-600', 'dark:text-neutral-300']">
-              <span :class="['font-medium', 'text-neutral-800', 'dark:text-neutral-100']">Matched source:</span>
+              <span :class="['font-medium', 'text-neutral-800', 'dark:text-neutral-100']">来源命中：</span>
               {{ formatBoolean(decision.matchedSource) }}
             </div>
             <div :class="['text-neutral-600', 'dark:text-neutral-300']">
-              <span :class="['font-medium', 'text-neutral-800', 'dark:text-neutral-100']">Sidecar ready:</span>
+              <span :class="['font-medium', 'text-neutral-800', 'dark:text-neutral-100']">Sidecar 就绪：</span>
               {{ formatBoolean(decision.sidecarReady) }}
             </div>
             <div :class="['text-neutral-600', 'dark:text-neutral-300']">
-              <span :class="['font-medium', 'text-neutral-800', 'dark:text-neutral-100']">Cooldown until:</span>
+              <span :class="['font-medium', 'text-neutral-800', 'dark:text-neutral-100']">冷却截止：</span>
               {{ formatTimestamp(decision.cooldownUntil) }}
             </div>
             <div :class="['text-neutral-600', 'dark:text-neutral-300']">
-              <span :class="['font-medium', 'text-neutral-800', 'dark:text-neutral-100']">Topic key:</span>
+              <span :class="['font-medium', 'text-neutral-800', 'dark:text-neutral-100']">主题键：</span>
               {{ decision.event.topicKey }}
             </div>
           </div>

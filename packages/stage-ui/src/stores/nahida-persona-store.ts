@@ -8,7 +8,11 @@ import { useAiriCardStore } from './modules/airi-card'
 import {
   composeNahidaPersonaSnapshot,
   composeNahidaPersonaSupplement,
+  getNahidaPersonaDisplayModeSummary,
+  getNahidaPersonaDisplaySectionPreviews,
+  getNahidaPersonaDisplaySummary,
   getNahidaPersonaModeBehavior,
+  getNahidaPersonaModeDisplayLabel,
   getNahidaPersonaSectionPreviews,
   isNahidaPersonaTarget,
 } from './nahida-persona'
@@ -48,17 +52,19 @@ export const useNahidaPersonaStore = defineStore('nahida-persona', () => {
     settings: settings.value,
   }))
   const activeModeSummary = computed(() => activeModeBehavior.value.summary)
-  const summary = computed(() => {
-    if (!settings.value.enabled) {
-      return 'Nahida persona layer is disabled. The active card remains unchanged.'
-    }
-
-    if (!matchesActiveCard.value) {
-      return 'Current active card and display model are not recognized as Nahida, so the supplement stays inactive.'
-    }
-
-    return `Nahida persona layer is active in ${settings.value.mode} mode. ${activeModeSummary.value}`
-  })
+  const displayModeLabel = computed(() => getNahidaPersonaModeDisplayLabel(settings.value.mode))
+  const displayActiveModeSummary = computed(() => getNahidaPersonaDisplayModeSummary(settings.value.mode))
+  const displaySections = computed(() => getNahidaPersonaDisplaySectionPreviews(settings.value.mode))
+  const summary = computed(() => getNahidaPersonaDisplaySummary({
+    enabled: settings.value.enabled,
+    matchesActiveCard: matchesActiveCard.value,
+    mode: settings.value.mode,
+  }))
+  const displaySummary = computed(() => getNahidaPersonaDisplaySummary({
+    enabled: settings.value.enabled,
+    matchesActiveCard: matchesActiveCard.value,
+    mode: settings.value.mode,
+  }))
   const snapshot = computed<NahidaPersonaSnapshot>(() => composeNahidaPersonaSnapshot({
     settings: settings.value,
     context: {
@@ -126,6 +132,10 @@ export const useNahidaPersonaStore = defineStore('nahida-persona', () => {
     activeDisplayModelName,
     activeModeSummary,
     activeSupplement,
+    displayActiveModeSummary,
+    displayModeLabel,
+    displaySections,
+    displaySummary,
     error,
     isActive,
     loading,

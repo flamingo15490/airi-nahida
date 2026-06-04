@@ -1,7 +1,13 @@
 <script setup lang="ts">
+import {
+  getNahidaPersonaDisplayModeSummary,
+  getNahidaPersonaDisplaySectionPreviews,
+  getNahidaPersonaDisplaySummary,
+  getNahidaPersonaModeDisplayLabel,
+} from '@proj-airi/stage-ui/stores/nahida-persona'
 import { Button, Callout, FieldCheckbox, FieldSelect } from '@proj-airi/ui'
 import { storeToRefs } from 'pinia'
-import { onMounted } from 'vue'
+import { computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import { useNahidaPersonaSettingsStore } from '../../../stores/settings/nahida-persona'
@@ -9,16 +15,13 @@ import { useNahidaPersonaSettingsStore } from '../../../stores/settings/nahida-p
 const personaStore = useNahidaPersonaSettingsStore()
 const {
   activeCardName,
-  activeModeSummary,
   error,
   isActive,
   loading,
   matchesActiveCard,
   modeOptions,
-  sections,
   saving,
   settings,
-  summary,
 } = storeToRefs(personaStore)
 const { t } = useI18n()
 
@@ -28,6 +31,15 @@ const sectionLabels: Record<string, string> = {
   'memory-boundaries': '记忆边界 / Memory boundaries',
   'taboos': '禁区 / Taboos',
 }
+
+const displayModeLabel = computed(() => getNahidaPersonaModeDisplayLabel(settings.value.mode))
+const displayActiveModeSummary = computed(() => getNahidaPersonaDisplayModeSummary(settings.value.mode))
+const displaySummary = computed(() => getNahidaPersonaDisplaySummary({
+  enabled: settings.value.enabled,
+  matchesActiveCard: matchesActiveCard.value,
+  mode: settings.value.mode,
+}))
+const displaySections = computed(() => getNahidaPersonaDisplaySectionPreviews(settings.value.mode))
 
 onMounted(() => {
   void personaStore.refresh()
@@ -88,23 +100,23 @@ onMounted(() => {
         </div>
         <div :class="['text-neutral-600', 'dark:text-neutral-300']">
           <span :class="['font-medium', 'text-neutral-800', 'dark:text-neutral-100']">{{ t('settings.pages.nahida-persona.status.summary') }}:</span>
-          {{ summary }}
+          {{ displaySummary }}
         </div>
       </div>
 
       <section :class="['flex', 'flex-col', 'gap-3', 'rounded-lg', 'border', 'border-neutral-200', 'bg-neutral-50/80', 'p-3', 'dark:border-neutral-800', 'dark:bg-neutral-950/30']">
         <div :class="['flex', 'flex-col', 'gap-1']">
           <h4 :class="['text-sm', 'font-medium', 'text-neutral-900', 'dark:text-neutral-100']">
-            Persona supplement preview
+            人格补充预览 / Persona supplement preview
           </h4>
           <p :class="['text-xs', 'text-neutral-600', 'dark:text-neutral-300']">
-            当前模式：{{ settings.mode }}。{{ activeModeSummary }}
+            当前模式：{{ displayModeLabel }}（{{ settings.mode }}）。{{ displayActiveModeSummary }}
           </p>
         </div>
 
         <div :class="['grid', 'gap-3', 'xl:grid-cols-2']">
           <article
-            v-for="section in sections"
+            v-for="section in displaySections"
             :key="section.id"
             :class="['flex', 'flex-col', 'gap-2', 'rounded-lg', 'bg-white/80', 'p-3', 'text-xs', 'shadow-sm', 'dark:bg-neutral-900/60']"
           >

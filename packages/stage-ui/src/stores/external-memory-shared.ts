@@ -46,31 +46,31 @@ export type ExternalMemoryWriteDecision
     | 'skipped-not-stable'
 
 export const EXTERNAL_MEMORY_LAYER_LABELS = {
-  'stable-profile': 'Stable profile',
-  'stable-preferences': 'Stable preferences',
-  'active-follow-ups': 'Active follow-ups',
-  'recent-context': 'Recent context',
-  'character-knowledge': 'Character knowledge',
+  'stable-profile': '稳定用户信息',
+  'stable-preferences': '稳定偏好设置',
+  'active-follow-ups': '当前待跟进',
+  'recent-context': '近期上下文',
+  'character-knowledge': '角色知识库',
 } satisfies Record<ExternalMemoryLayerKind, string>
 
 const EXTERNAL_MEMORY_REASON_MESSAGES = {
-  'bridge-ready': 'External memory bridge is available and can provide JSON-safe snapshots in this runtime.',
-  'bridge-degraded': 'External memory bridge is partially available, but the latest read or write still needs attention.',
-  'bridge-disabled': 'External memory bridge is intentionally disabled, so AIRI will not read or write the desktop memory root.',
-  'bridge-unavailable': 'External memory bridge is not available in this runtime yet.',
-  'document-loaded': 'The external memory document was loaded and produced usable JSON-safe items.',
-  'document-empty': 'The external memory document was reachable, but it did not produce any usable items.',
-  'document-missing': 'The external memory document is missing from the configured desktop memory root.',
-  'document-read-failed': 'The external memory document could not be read into a JSON-safe snapshot.',
-  'layer-selected': 'This memory layer contributed evidence to the latest turn snapshot.',
-  'layer-empty': 'This memory layer did not contribute evidence to the latest turn snapshot.',
-  'context-loaded': 'The latest turn snapshot contains memory evidence that can be cited by renderer consumers.',
-  'context-empty': 'The latest turn snapshot completed without any memory evidence.',
-  'write-written': 'The reviewed memory candidate changed the external memory document.',
-  'write-skipped-unavailable': 'The reviewed memory candidate could not be written because the external memory root was unavailable.',
-  'write-skipped-empty': 'The reviewed memory candidate did not contain any persisted content after normalization.',
-  'write-skipped-duplicate': 'The reviewed memory candidate matched existing memory content, so no write was needed.',
-  'write-skipped-not-stable': 'The reviewed memory candidate was rejected because it was not stable enough to persist.',
+  'bridge-ready': '当前运行时可用记忆桥接，并可提供 JSON-safe 快照。',
+  'bridge-degraded': '记忆桥接当前部分可用，但最近一次读取或写回仍需关注。',
+  'bridge-disabled': '记忆桥接已被显式禁用，因此 AIRI 不会读取或写回桌面记忆根目录。',
+  'bridge-unavailable': '当前运行时尚未提供可用的记忆桥接。',
+  'document-loaded': '记忆文档已成功读取，并生成了可用的 JSON-safe 条目。',
+  'document-empty': '记忆文档可以访问，但没有生成可用条目。',
+  'document-missing': '配置的桌面记忆根目录中缺少该记忆文档。',
+  'document-read-failed': '该记忆文档未能读取为 JSON-safe 快照。',
+  'layer-selected': '这一记忆层为最近一次记忆快照提供了证据。',
+  'layer-empty': '这一记忆层没有为最近一次记忆快照提供证据。',
+  'context-loaded': '最近一次记忆快照包含可供渲染进程引用的记忆证据。',
+  'context-empty': '最近一次记忆快照完成了构建，但没有产出记忆证据。',
+  'write-written': '已评审的记忆候选改动了外部记忆文档。',
+  'write-skipped-unavailable': '由于外部记忆根目录不可用，已评审的记忆候选未能写回。',
+  'write-skipped-empty': '已评审的记忆候选在规范化后没有可落盘内容。',
+  'write-skipped-duplicate': '已评审的记忆候选与现有记忆内容重复，因此无需写回。',
+  'write-skipped-not-stable': '已评审的记忆候选因稳定性不足而被拒绝写回。',
 } satisfies Record<ExternalMemoryReasonCode, string>
 
 /**
@@ -390,7 +390,7 @@ export function createDefaultExternalMemoryTurnSnapshot(): ExternalMemoryTurnSna
     readAt: 0,
     layerOrder: [...EXTERNAL_MEMORY_LAYER_KINDS],
     usedLayers: [],
-    summary: 'No external memory turn snapshot has been recorded yet.',
+    summary: '尚未记录任何记忆快照。',
     selections: [],
     evidence: [],
     citations: [],
@@ -403,7 +403,7 @@ export function createDefaultExternalMemoryTurnSnapshot(): ExternalMemoryTurnSna
 export function createDefaultExternalMemoryWriteReviewSnapshot(): ExternalMemoryWriteReviewSnapshot {
   return {
     reviewedAt: 0,
-    summary: 'No external memory write review has been recorded yet.',
+    summary: '尚未记录任何写回评审。',
     decision: 'skipped-empty',
     reason: createExternalMemoryReasonSnapshot('write-skipped-empty'),
     candidates: [],
@@ -417,7 +417,7 @@ export function createDefaultExternalMemoryUsageSnapshot(): ExternalMemoryUsageS
   return {
     bridgeState: 'unavailable',
     reason: createExternalMemoryReasonSnapshot('bridge-unavailable'),
-    summary: 'External memory bridge is not available in this runtime.',
+    summary: '当前运行时尚未提供可用的记忆桥接。',
     turn: createDefaultExternalMemoryTurnSnapshot(),
     lastWriteReview: createDefaultExternalMemoryWriteReviewSnapshot(),
     recentWrites: [],

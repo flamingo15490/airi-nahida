@@ -154,7 +154,7 @@ function normalizeContextDestinations(event: ProactiveCompanionContextUpdateInpu
 
 function createEventSnapshot(event: ProactiveCompanionSparkNotifyInput): ProactiveCompanionEventSnapshot {
   const receivedAt = Date.now()
-  const headline = event.data.headline?.trim() || 'Untitled proactive reminder'
+  const headline = event.data.headline?.trim() || '未命名主动陪伴提醒'
 
   return {
     id: event.data.id,
@@ -196,13 +196,13 @@ function selectPresentation(
 function describeSupportedKind(kind: ProactiveCompanionEventKind) {
   switch (kind) {
     case 'gentle-check-in':
-      return 'gentle-check-in'
+      return '轻提醒'
     case 'reminder':
-      return 'reminder'
+      return '提醒'
     case 'important':
-      return 'important'
+      return '重要提醒'
     default:
-      return 'unknown'
+      return '未知类型'
   }
 }
 
@@ -236,7 +236,7 @@ function createCompatibilityContextSnapshot(event: ProactiveCompanionContextUpda
     ? note
         .replace(/^\[Proactive companion internal instruction\]\s*/i, '')
         .slice(0, 120)
-    : 'Legacy proactive companion context update'
+    : '旧版主动陪伴上下文更新'
 
   return {
     id: event.metadata?.event?.id || event.data.contextId || event.data.id || `legacy-context-${receivedAt}`,
@@ -292,18 +292,18 @@ function buildRuntimeState(params: {
 
   const summary = (() => {
     if (state === 'disabled') {
-      return 'Proactive companion delivery is disabled.'
+      return '主动陪伴已关闭。'
     }
 
     if (!params.sidecarSnapshot) {
-      return 'Companion sidecar integration has not been configured yet.'
+      return '主动陪伴 sidecar 集成尚未配置。'
     }
 
     if (sidecarConnected) {
-      return 'Proactive companion governance is ready.'
+      return '主动陪伴已就绪。'
     }
 
-    return 'Companion sidecar is connected through AIRI, but proactive delivery is currently degraded.'
+    return '主动陪伴 sidecar 已接入 AIRI，但当前放行链路已降级。'
   })()
 
   return {
@@ -311,7 +311,7 @@ function buildRuntimeState(params: {
     state,
     summary,
     sidecarConnected,
-    sidecarSummary: sidecarStatus?.summary ?? 'Companion sidecar status is unavailable.',
+    sidecarSummary: sidecarStatus?.summary ?? 'sidecar 状态暂不可用。',
     recentDecisions: params.recentDecisions,
     lastDecision: params.lastDecision,
     lastFailureReason: params.lastFailureReason,
@@ -345,21 +345,21 @@ function buildDeliveryReason(params: {
   intensity: ProactiveCompanionSettings['intensity']
 }) {
   if (params.event.kind === 'important' && params.intensity === 'balanced') {
-    return 'Delivered because the event passed source, destination, content, and cooldown checks, and balanced intensity allows important reminders to surface more clearly.'
+    return '已放行，因为事件通过了来源、目标、内容和冷却检查，且平衡强度允许重要提醒更明显地呈现。'
   }
 
   if (params.event.kind === 'important') {
-    return 'Delivered because the event passed source, destination, content, and cooldown checks, but low intensity keeps important reminders as restrained light prompts.'
+    return '已放行，因为事件通过了来源、目标、内容和冷却检查，但低频克制强度会让重要提醒保持轻提示。'
   }
 
-  return 'Delivered because the event passed source, destination, content, and cooldown checks while staying on the restrained reminder path.'
+  return '已放行，因为事件通过了来源、目标、内容和冷却检查，并保持在克制的提醒路径上。'
 }
 
 function buildLegacyCompatibilityReason(event: ProactiveCompanionEventSnapshot) {
   const legacySource = event.source.replace(/^legacy:/, '')
   const inferredKind = describeSupportedKind(event.kind)
 
-  return `Recorded via the legacy context:update compatibility path as a ${inferredKind} event inferred from source "${legacySource}". This is a history-only compatibility record and does not trigger a new proactive reaction.`
+  return `这是通过 legacy context:update 兼容路径记入的一条${inferredKind}事件，来源推断为“${legacySource}”。它只用于历史记录，不会触发新的主动陪伴反应。`
 }
 
 /**
@@ -487,7 +487,7 @@ export function createProactiveCompanionManager(params: {
         return buildDecision({
           event: eventSnapshot,
           decision: 'suppressed',
-          reason: 'Proactive companion delivery is disabled.',
+          reason: '已压制，因为主动陪伴已关闭。',
           presentation: 'silent',
           matchedSource,
           sidecarReady,
@@ -499,8 +499,8 @@ export function createProactiveCompanionManager(params: {
           event: eventSnapshot,
           decision: 'dropped',
           reason: sidecarSnapshot?.status.summary
-            ? `Dropped because the companion sidecar is not currently ready: ${sidecarSnapshot.status.summary}`
-            : 'Dropped because the companion sidecar is not currently ready.',
+            ? `已丢弃，因为 companion sidecar 当前未就绪：${sidecarSnapshot.status.summary}`
+            : '已丢弃，因为 companion sidecar 当前未就绪。',
           presentation: 'silent',
           matchedSource,
           sidecarReady,
@@ -511,7 +511,7 @@ export function createProactiveCompanionManager(params: {
         return buildDecision({
           event: eventSnapshot,
           decision: 'suppressed',
-          reason: 'Suppressed because the sidecar event did not target the AIRI character reminder destination.',
+          reason: '已压制，因为 sidecar 事件没有指向 AIRI 角色提醒目标。',
           presentation: 'silent',
           matchedSource,
           sidecarReady,
@@ -522,7 +522,7 @@ export function createProactiveCompanionManager(params: {
         return buildDecision({
           event: eventSnapshot,
           decision: 'suppressed',
-          reason: 'Suppressed because the sidecar event did not include a headline or note worth surfacing as a reminder.',
+          reason: '已压制，因为 sidecar 事件没有提供值得展示为提醒的标题或备注。',
           presentation: 'silent',
           matchedSource,
           sidecarReady,
@@ -533,7 +533,7 @@ export function createProactiveCompanionManager(params: {
         return buildDecision({
           event: eventSnapshot,
           decision: 'suppressed',
-          reason: `Suppressed because the sidecar event kind "${eventSnapshot.rawKind ?? 'unknown'}" did not map to the supported gentle-check-in, reminder, or important categories.`,
+          reason: `已压制，因为 sidecar 事件类型“${eventSnapshot.rawKind ?? '未知'}”没有映射到支持的轻提醒、提醒或重要提醒类别。`,
           presentation: 'silent',
           matchedSource,
           sidecarReady,
@@ -544,7 +544,7 @@ export function createProactiveCompanionManager(params: {
         return buildDecision({
           event: eventSnapshot,
           decision: 'suppressed',
-          reason: 'Suppressed because the global proactive cooldown is still active after a recent delivered reminder.',
+          reason: '已压制，因为全局主动陪伴冷却仍在生效，最近刚有一次已放行提醒。',
           presentation: 'silent',
           matchedSource,
           sidecarReady,
@@ -556,7 +556,7 @@ export function createProactiveCompanionManager(params: {
         return buildDecision({
           event: eventSnapshot,
           decision: 'suppressed',
-          reason: 'Suppressed because a similar proactive reminder was already delivered recently and the topic cooldown is still active.',
+          reason: '已压制，因为相似的主动陪伴提醒最近已经放行过，主题冷却仍在生效。',
           presentation: 'silent',
           matchedSource,
           sidecarReady,

@@ -220,7 +220,7 @@ function createUnknownStatus(kind: ExternalIntegrationKind, config: ExternalInte
     return {
       kind,
       state: 'disabled',
-      summary: 'Integration disabled.',
+      summary: '集成已关闭。',
     }
   }
 
@@ -228,14 +228,14 @@ function createUnknownStatus(kind: ExternalIntegrationKind, config: ExternalInte
     return {
       kind,
       state: 'not-configured',
-      summary: 'Companion sidecar identification is incomplete.',
+      summary: '主动陪伴 sidecar 的标识信息不完整。',
     }
   }
 
   return {
     kind,
     state: 'unknown',
-    summary: 'Status has not been checked yet.',
+    summary: '状态尚未检查。',
   }
 }
 
@@ -248,7 +248,7 @@ function createStatusFromProbe(
     return {
       kind: result.kind,
       state: 'disabled',
-      summary: 'Integration disabled.',
+      summary: '集成已关闭。',
       checkedAt: result.checkedAt,
       lastSuccessAt: previous?.lastSuccessAt,
     }
@@ -380,7 +380,7 @@ async function probeMemoryIntegration(
       kind: 'memory',
       ok: false,
       checkedAt,
-      summary: 'Memory integration is disabled.',
+      summary: '记忆集成已关闭。',
     }
   }
 
@@ -399,7 +399,7 @@ async function probeMemoryIntegration(
   let filesystemRuntimeState: string | undefined
   let obsidianRuntimeState: string | undefined
   let obsidianConfigured = false
-  let summary = 'Memory integration is ready.'
+  let summary = '记忆集成已就绪。'
   let error: string | undefined
   let ok = true
 
@@ -418,38 +418,38 @@ async function probeMemoryIntegration(
 
     if (!rootPathExists) {
       ok = false
-      summary = 'Memory root path does not exist.'
+      summary = '记忆根目录不存在。'
       error = config.rootPath
     }
     else if (!rootPathIsDirectory) {
       ok = false
-      summary = 'Memory root path is not a directory.'
+      summary = '记忆根目录不是目录。'
       error = config.rootPath
     }
     else if (!filesystemServer) {
       ok = false
-      summary = 'Filesystem MCP server for memory is missing.'
+      summary = '用于记忆桥接的 Filesystem MCP 服务未找到。'
       error = config.filesystemServerName
     }
     else if (configuredRootPath && configuredRootPath !== config.rootPath) {
       ok = false
-      summary = 'Memory root path is out of sync with MCP.'
+      summary = '记忆根目录与 MCP 配置不同步。'
       error = `MCP points to ${configuredRootPath}`
     }
     else if (filesystemRuntimeState && filesystemRuntimeState !== 'running') {
       ok = false
-      summary = 'Filesystem MCP server is not running.'
+      summary = 'Filesystem MCP 服务当前未在运行。'
       error = filesystemRuntimeState
     }
     else if (obsidianConfigured && obsidianRuntimeState && obsidianRuntimeState !== 'running') {
       ok = false
-      summary = 'Obsidian bridge is configured but not running.'
+      summary = 'Obsidian 桥接已配置，但当前未运行。'
       error = obsidianRuntimeState
     }
   }
   catch (probeError) {
     ok = false
-    summary = 'Unable to inspect the current MCP memory bridge.'
+    summary = '无法检查当前的 MCP 记忆桥接状态。'
     error = errorMessageFrom(probeError) ?? 'Unknown error'
   }
 
@@ -488,7 +488,7 @@ async function probeCompanionSidecarIntegration(
       kind: 'companion-sidecar',
       ok: false,
       checkedAt,
-      summary: 'Companion sidecar integration is disabled.',
+      summary: '主动陪伴 sidecar 集成已关闭。',
     }
   }
 
@@ -497,7 +497,7 @@ async function probeCompanionSidecarIntegration(
       kind: 'companion-sidecar',
       ok: false,
       checkedAt,
-      summary: 'Companion sidecar identification is incomplete.',
+      summary: '主动陪伴 sidecar 的标识信息不完整。',
       error: 'pluginId',
     }
   }
@@ -527,7 +527,7 @@ async function probeCompanionSidecarIntegration(
       kind: 'companion-sidecar',
       ok: false,
       checkedAt,
-      summary: 'Companion sidecar is not connected to the current AIRI server channel.',
+      summary: '主动陪伴 sidecar 尚未连接到当前 AIRI 连接通道。',
       error: config.pluginId,
       details,
     }
@@ -538,7 +538,7 @@ async function probeCompanionSidecarIntegration(
       kind: 'companion-sidecar',
       ok: false,
       checkedAt,
-      summary: 'Companion sidecar is connected but not healthy yet.',
+      summary: '主动陪伴 sidecar 已连接，但健康状态尚未就绪。',
       error: matchedModule.authenticated ? 'unhealthy' : 'unauthenticated',
       details: {
         ...details,
@@ -552,7 +552,7 @@ async function probeCompanionSidecarIntegration(
       kind: 'companion-sidecar',
       ok: false,
       checkedAt,
-      summary: 'Companion sidecar expects a different AIRI websocket address.',
+      summary: '主动陪伴 sidecar 期望连接的 AIRI WebSocket 地址与当前连接不一致。',
       error: `${config.expectedWsUrl.trim()} != ${currentWsUrl}`,
       details: {
         ...details,
@@ -565,7 +565,7 @@ async function probeCompanionSidecarIntegration(
     kind: 'companion-sidecar',
     ok: true,
     checkedAt,
-    summary: 'Companion sidecar is connected to the current AIRI server channel.',
+    summary: '主动陪伴 sidecar 已连接到当前 AIRI 连接通道。',
     details: {
       ...details,
       lastHeartbeatAt: matchedModule.lastHeartbeatAt,

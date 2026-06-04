@@ -1,12 +1,12 @@
-import type { ExternalMemoryUsageSnapshot } from './external-memory-shared'
-import type { NahidaPersonaSnapshot } from './nahida-persona-shared'
-import type { ProactiveCompanionRuntimeSnapshot } from './proactive-companion-shared'
+import type { ExternalMemoryDocumentKind, ExternalMemoryUsageSnapshot } from '@proj-airi/stage-ui/stores/external-memory-shared'
+import type { NahidaPersonaSnapshot } from '@proj-airi/stage-ui/stores/nahida-persona-shared'
+import type { ProactiveCompanionRuntimeSnapshot } from '@proj-airi/stage-ui/stores/proactive-companion-shared'
 
-import { createDefaultExternalMemoryUsageSnapshot } from './external-memory-shared'
+import { createDefaultExternalMemoryUsageSnapshot } from '@proj-airi/stage-ui/stores/external-memory-shared'
 import {
   createDefaultNahidaPersonaSettings,
-} from './nahida-persona-shared'
-import { createDefaultProactiveCompanionRuntimeSnapshot } from './proactive-companion-shared'
+} from '@proj-airi/stage-ui/stores/nahida-persona-shared'
+import { createDefaultProactiveCompanionRuntimeSnapshot } from '@proj-airi/stage-ui/stores/proactive-companion-shared'
 
 export const COMPANION_COORDINATION_SURFACES = [
   'memory',
@@ -128,16 +128,56 @@ export function createDefaultCompanionCoordinationSnapshot() {
       ...createDefaultNahidaPersonaSettings(),
       matchesActiveCard: false,
       isActive: false,
-      summary: 'Nahida persona layer is disabled. The active card remains unchanged.',
-      activeModeSummary: 'Balanced continuity.',
+      summary: '纳西妲人格层未启用，当前角色卡保持不变。',
+      activeModeSummary: '平衡地延续当前语境。',
       sections: [],
     },
     proactiveRuntime: createDefaultProactiveCompanionRuntimeSnapshot(),
   })
 }
 
+const externalMemoryDocumentKindLabels = {
+  'user-profile': '用户信息',
+  'preferences': '偏好设置',
+  'follow-ups': '待跟进',
+  'recent-summary': '近期摘要',
+  'character-knowledge': '角色知识库',
+} satisfies Record<ExternalMemoryDocumentKind, string>
+
 function joinCoverage(labels: string[]) {
-  return labels.length > 0 ? labels.join(', ') : 'None'
+  return labels.length > 0 ? labels.join('、') : '无'
+}
+
+function formatMemoryDocumentKind(kind: ExternalMemoryDocumentKind) {
+  return externalMemoryDocumentKindLabels[kind]
+}
+
+function describePersonaMode(mode: NahidaPersonaSnapshot['mode']) {
+  switch (mode) {
+    case 'reserved':
+      return '克制'
+    case 'balanced':
+      return '平衡'
+    case 'active':
+      return '主动'
+    default:
+      return mode
+  }
+}
+
+function describeDecision(decision: string) {
+  switch (decision) {
+    case 'delivered':
+      return '已放行'
+    case 'suppressed':
+      return '已压制'
+    case 'deferred':
+      return '已延后'
+    case 'dropped':
+      return '已丢弃'
+    default:
+      return decision
+  }
 }
 
 function pickLatestTimestamp(candidates: Array<number | undefined>) {
@@ -174,59 +214,60 @@ function composeMemoryWriteActivity(memoryUsage: ExternalMemoryUsageSnapshot) {
     return latestWrite.summary
   }
 
+  const kindLabel = formatMemoryDocumentKind(latestWrite.kind)
   if (latestWrite.decision === 'written') {
-    return `Latest memory write updated ${latestWrite.kind}.`
+    return `最近写回已更新${kindLabel}。`
   }
 
   if (latestWrite.decision === 'skipped-duplicate') {
-    return `Latest memory write skipped ${latestWrite.kind} because it was already up to date.`
+    return `最近写回未更新${kindLabel}，因为内容已经是最新。`
   }
 
   if (latestWrite.decision === 'skipped-empty') {
-    return `Latest memory write skipped ${latestWrite.kind} because there was nothing stable to save.`
+    return `最近写回未更新${kindLabel}，因为没有可稳定保存的内容。`
   }
 
   if (latestWrite.decision === 'skipped-not-stable') {
-    return `Latest memory write skipped ${latestWrite.kind} because the candidate content was not stable enough to persist.`
+    return `最近写回未更新${kindLabel}，因为候选内容还不够稳定。`
   }
 
-  return `Latest memory write could not reach ${latestWrite.kind} because the bridge was unavailable.`
+  return `最近写回未能更新${kindLabel}，因为桥接当前不可用。`
 }
 
 function composeMemoryActivity(memoryUsage: ExternalMemoryUsageSnapshot) {
   const usedDocumentKindCount = memoryUsage.lastUsedDocumentKinds.length
   if (memoryUsage.context) {
     if (usedDocumentKindCount === 0) {
-      return 'Latest memory context refresh finished without any stable sections.'
+      return '最近一次记忆上下文刷新完成，但没有纳入稳定内容。'
     }
 
     const stableItemCount = countMemorySectionItems(memoryUsage)
     if (stableItemCount === 0) {
-      return `${usedDocumentKindCount} document kinds contributed to the latest memory context.`
+      return `最近一次记忆上下文引用了 ${usedDocumentKindCount} 类文档。`
     }
 
-    return `${usedDocumentKindCount} document kinds contributed ${stableItemCount} stable memory items to the latest context.`
+    return `最近一次记忆上下文引用了 ${usedDocumentKindCount} 类文档，共纳入 ${stableItemCount} 条稳定记忆。`
   }
 
   return composeMemoryWriteActivity(memoryUsage)
     ?? memoryUsage.lastReadSummary
-    ?? 'No external memory activity has been recorded yet.'
+    ?? '还没有记录到记忆活动。'
 }
 
 function composeMemoryCoverage(memoryUsage: ExternalMemoryUsageSnapshot) {
   if (memoryUsage.lastUsedDocumentKinds.length > 0) {
-    return `Latest memory coverage: ${joinCoverage(memoryUsage.lastUsedDocumentKinds)}.`
+    return `最近覆盖：${joinCoverage(memoryUsage.lastUsedDocumentKinds.map(formatMemoryDocumentKind))}。`
   }
 
   if (memoryUsage.context) {
-    return 'Latest memory coverage: no stable sections were included in the latest context.'
+    return '最近覆盖：最近一次上下文里没有纳入稳定分层。'
   }
 
   if (memoryUsage.lastWrite) {
-    return 'Latest memory coverage: awaiting a context refresh after the latest write.'
+    return '最近覆盖：等待最近一次写回后的上下文刷新。'
   }
 
-  return 'Latest memory coverage: none recorded yet.'
+  return '最近覆盖：暂无记录。'
 }
 
 function getMemoryUpdatedAt(memoryUsage: ExternalMemoryUsageSnapshot) {
@@ -239,24 +280,25 @@ function getMemoryUpdatedAt(memoryUsage: ExternalMemoryUsageSnapshot) {
 }
 
 function describePersonaActivity(persona: NahidaPersonaSnapshot) {
+  const modeLabel = describePersonaMode(persona.mode)
   if (!persona.enabled) {
-    return `Persona mode: ${persona.mode}. Disabled by user.`
+    return `人格模式：${modeLabel}。已由用户关闭。`
   }
 
   if (persona.isActive) {
-    return `Persona mode: ${persona.mode}. ${persona.activeModeSummary}`
+    return `人格模式：${modeLabel}。${persona.activeModeSummary}`
   }
 
-  return `Persona mode: ${persona.mode}. Enabled, waiting for a Nahida target.`
+  return `人格模式：${modeLabel}。已启用，正在等待命中纳西妲目标。`
 }
 
 function describePersonaCoverage(persona: NahidaPersonaSnapshot) {
   const cardCoverage = persona.activeCardName
-    ? `Card: ${persona.activeCardName}.`
-    : 'Card: none.'
+    ? `角色卡：${persona.activeCardName}。`
+    : '角色卡：无。'
   const displayModelCoverage = persona.activeDisplayModelName
-    ? `Display model: ${persona.activeDisplayModelName}.`
-    : 'Display model: none.'
+    ? `展示模型：${persona.activeDisplayModelName}。`
+    : '展示模型：无。'
 
   return `${cardCoverage} ${displayModelCoverage}`
 }
@@ -284,14 +326,14 @@ function findActiveCooldown(runtime: ProactiveCompanionRuntimeSnapshot) {
 function describeProactiveActivity(runtime: ProactiveCompanionRuntimeSnapshot) {
   const latestDecision = findLatestDecision(runtime)
   if (!latestDecision) {
-    return 'No proactive reminder decisions have been recorded yet.'
+    return '还没有记录到主动陪伴判定。'
   }
 
   const recentDecisionCount = countRecentDecisions(runtime)
-  const latestDecisionActivity = `Latest decision: ${latestDecision.decision}.`
+  const latestDecisionActivity = `最近判定：${describeDecision(latestDecision.decision)}。`
 
   if (recentDecisionCount > 0) {
-    return `${latestDecisionActivity} ${recentDecisionCount} recent decisions are available.`
+    return `${latestDecisionActivity}当前可查看 ${recentDecisionCount} 条最近判定。`
   }
 
   return latestDecisionActivity
@@ -299,12 +341,12 @@ function describeProactiveActivity(runtime: ProactiveCompanionRuntimeSnapshot) {
 
 function describeProactiveCoverage(runtime: ProactiveCompanionRuntimeSnapshot) {
   if (runtime.sidecarSummary.trim()) {
-    return `Sidecar: ${runtime.sidecarSummary}`
+    return `sidecar：${runtime.sidecarSummary}`
   }
 
   return runtime.sidecarConnected
-    ? 'Sidecar: connected.'
-    : 'Sidecar: status unavailable.'
+    ? 'sidecar：已连接。'
+    : 'sidecar：状态暂不可用。'
 }
 
 /**
@@ -352,9 +394,9 @@ export function composeCompanionCoordinationSnapshot(params: {
       status: 'attention',
       reason: {
         code: 'phase-attention',
-        message: 'Phase-six coordination still needs attention before the frozen memory, persona, and proactive surfaces can be treated as aligned.',
+        message: '当前协同仍需关注，记忆、人格与主动陪伴这三条线还没有完全对齐。',
       },
-      summary: `${attentionCount} coordination surfaces need attention in the current phase.`,
+      summary: `当前有 ${attentionCount} 个协同面仍需关注。`,
       surfaces,
       readyCount,
       attentionCount,
@@ -368,11 +410,11 @@ export function composeCompanionCoordinationSnapshot(params: {
       status: 'ready',
       reason: {
         code: 'phase-ready',
-        message: 'Phase-six coordination is aligned across the currently active frozen surfaces without expanding any subsystem logic.',
+        message: '当前已启用的协同面已经完成对齐。',
       },
       summary: readyCount === surfaces.length
-        ? 'All frozen coordination surfaces are aligned for phase six.'
-        : `${readyCount} coordination surfaces are active and aligned in the current phase.`,
+        ? '当前所有协同面都已对齐。'
+        : `当前有 ${readyCount} 个协同面已启用并完成对齐。`,
       surfaces,
       readyCount,
       attentionCount,
@@ -385,9 +427,9 @@ export function composeCompanionCoordinationSnapshot(params: {
     status: 'inactive',
     reason: {
       code: 'phase-inactive',
-      message: 'Phase-six coordination remains intentionally scoped, so inactive surfaces stay out of the overview until their own lane enables them.',
+      message: '当前协同仍按既定范围运行，未启用的协同面会保持未启用状态。',
     },
-    summary: 'No coordination surfaces are active right now.',
+    summary: '当前还没有启用中的协同面。',
     surfaces,
     readyCount,
     attentionCount,
@@ -406,16 +448,16 @@ function composeMemorySurface(memoryUsage: ExternalMemoryUsageSnapshot): Compani
     const reason: CompanionCoordinationReason = hasCoverage
       ? {
           code: 'memory-ready',
-          message: 'External memory is connected and contributing stable context to AIRI in the current phase.',
+          message: '记忆桥接已连接，当前能为 AIRI 提供稳定上下文。',
         }
       : {
           code: 'memory-empty',
-          message: 'External memory is connected, but the latest context did not contribute any stable memory sections yet.',
+          message: '记忆桥接已连接，但最近一次上下文还没有纳入稳定记忆分层。',
         }
 
     return {
       surface: 'memory',
-      title: 'Memory',
+      title: '记忆',
       status: 'ready',
       reason,
       overview: {
@@ -431,12 +473,12 @@ function composeMemorySurface(memoryUsage: ExternalMemoryUsageSnapshot): Compani
   if (memoryUsage.bridgeState === 'disabled') {
     const reason = {
       code: 'memory-disabled',
-      message: 'External memory coordination is disabled, so AIRI will not read or write the desktop memory bridge in this phase.',
+      message: '记忆协同已关闭，当前不会读写桌面端记忆桥接。',
     } satisfies CompanionCoordinationReason
 
     return {
       surface: 'memory',
-      title: 'Memory',
+      title: '记忆',
       status: 'inactive',
       reason,
       overview: {
@@ -452,12 +494,12 @@ function composeMemorySurface(memoryUsage: ExternalMemoryUsageSnapshot): Compani
   if (memoryUsage.bridgeState === 'degraded') {
     const reason = {
       code: 'memory-degraded',
-      message: 'External memory is reachable, but the latest read or write still needs attention before coordination is fully reliable.',
+      message: '记忆桥接可以访问，但最近一次读写结果仍需关注。',
     } satisfies CompanionCoordinationReason
 
     return {
       surface: 'memory',
-      title: 'Memory',
+      title: '记忆',
       status: 'attention',
       reason,
       overview: {
@@ -472,12 +514,12 @@ function composeMemorySurface(memoryUsage: ExternalMemoryUsageSnapshot): Compani
 
   const reason = {
     code: 'memory-unavailable',
-    message: 'External memory bridge is not available in this runtime yet, so phase-six coordination cannot verify it.',
+    message: '记忆桥接当前运行时暂不可用，因此暂时无法纳入协同确认。',
   } satisfies CompanionCoordinationReason
 
   return {
     surface: 'memory',
-    title: 'Memory',
+    title: '记忆',
     status: 'attention',
     reason,
     overview: {
@@ -497,12 +539,12 @@ function composePersonaSurface(persona: NahidaPersonaSnapshot): CompanionCoordin
   if (persona.isActive) {
     const reason = {
       code: 'persona-active',
-      message: 'Nahida persona is active because the current card or selected display model resolves to Nahida, and this phase keeps it as a read-only expression layer.',
+      message: '当前角色卡或展示模型已命中纳西妲，因此人格层正在生效。',
     } satisfies CompanionCoordinationReason
 
     return {
       surface: 'persona',
-      title: 'Persona',
+      title: '人格',
       status: 'ready',
       reason,
       overview: {
@@ -517,12 +559,12 @@ function composePersonaSurface(persona: NahidaPersonaSnapshot): CompanionCoordin
   if (!persona.enabled) {
     const reason = {
       code: 'persona-disabled',
-      message: 'Nahida persona is disabled by the user, so the base card stays unchanged and this surface remains inactive.',
+      message: '纳西妲人格已由用户关闭，因此当前人格面保持未启用。',
     } satisfies CompanionCoordinationReason
 
     return {
       surface: 'persona',
-      title: 'Persona',
+      title: '人格',
       status: 'inactive',
       reason,
       overview: {
@@ -536,12 +578,12 @@ function composePersonaSurface(persona: NahidaPersonaSnapshot): CompanionCoordin
 
   const reason = {
     code: 'persona-target-mismatch',
-    message: 'Nahida persona is enabled, but neither the current active card nor the selected display model resolves to Nahida, so the layer needs attention.',
+    message: '纳西妲人格已启用，但当前角色卡和展示模型都没有命中纳西妲，因此仍需关注。',
   } satisfies CompanionCoordinationReason
 
   return {
     surface: 'persona',
-    title: 'Persona',
+    title: '人格',
     status: 'attention',
     reason,
     overview: {
@@ -562,16 +604,16 @@ function composeProactiveSurface(runtime: ProactiveCompanionRuntimeSnapshot): Co
     const reason: CompanionCoordinationReason = latestCooldownDecision
       ? {
           code: 'proactive-cooldown-active',
-          message: 'Proactive governance is ready, and a current cooldown is intentionally suppressing repeated reminders.',
+          message: '主动陪伴当前可用，但正在冷却中，因此会暂时压制重复提醒。',
         }
       : {
           code: 'proactive-ready',
-          message: 'Proactive governance is ready and can evaluate companion-sidecar reminders within the frozen phase-six rules.',
+          message: '主动陪伴当前可用，能够按既定规则判断 sidecar 提醒。',
         }
 
     return {
       surface: 'proactive',
-      title: 'Proactive',
+      title: '主动陪伴',
       status: 'ready',
       reason,
       overview: {
@@ -587,12 +629,12 @@ function composeProactiveSurface(runtime: ProactiveCompanionRuntimeSnapshot): Co
   if (runtime.state === 'disabled') {
     const reason = {
       code: 'proactive-disabled',
-      message: 'Proactive governance is disabled, so companion-sidecar reminders stay outside AIRI in this phase.',
+      message: '主动陪伴已关闭，因此 sidecar 提醒当前不会进入 AIRI。',
     } satisfies CompanionCoordinationReason
 
     return {
       surface: 'proactive',
-      title: 'Proactive',
+      title: '主动陪伴',
       status: 'inactive',
       reason,
       overview: {
@@ -608,12 +650,12 @@ function composeProactiveSurface(runtime: ProactiveCompanionRuntimeSnapshot): Co
   if (runtime.state === 'degraded') {
     const reason = {
       code: 'proactive-degraded',
-      message: 'Proactive governance is partially available, but sidecar readiness or runtime health still needs attention.',
+      message: '主动陪伴部分可用，但 sidecar 就绪状态或运行健康度仍需关注。',
     } satisfies CompanionCoordinationReason
 
     return {
       surface: 'proactive',
-      title: 'Proactive',
+      title: '主动陪伴',
       status: 'attention',
       reason,
       overview: {
@@ -628,12 +670,12 @@ function composeProactiveSurface(runtime: ProactiveCompanionRuntimeSnapshot): Co
 
   const reason = {
     code: 'proactive-unavailable',
-    message: 'Proactive governance is not available in this runtime yet, so phase-six coordination cannot verify the sidecar reminder lane.',
+    message: '主动陪伴当前运行时暂不可用，因此暂时无法纳入协同确认。',
   } satisfies CompanionCoordinationReason
 
   return {
     surface: 'proactive',
-    title: 'Proactive',
+    title: '主动陪伴',
     status: 'attention',
     reason,
     overview: {

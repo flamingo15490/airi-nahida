@@ -79,17 +79,17 @@ const latestWriteReviewCandidates = computed(() => candidateHistory.value)
 function formatWriteDecision(decision?: string) {
   switch (decision) {
     case 'written':
-      return 'Written'
+      return '已写回'
     case 'skipped-unavailable':
-      return 'Skipped: unavailable'
+      return '已跳过：不可用'
     case 'skipped-empty':
-      return 'Skipped: empty'
+      return '已跳过：内容为空'
     case 'skipped-duplicate':
-      return 'Skipped: duplicate'
+      return '已跳过：内容重复'
     case 'skipped-not-stable':
-      return 'Skipped: not stable'
+      return '已跳过：不够稳定'
     default:
-      return 'Unknown'
+      return '未知'
   }
 }
 
@@ -144,7 +144,7 @@ async function writeRecentSummary() {
 async function refreshSnapshotPanel() {
   try {
     await memoryStore.refreshTurnSnapshot()
-    toast.success('Turn snapshot refreshed.')
+    toast.success('记忆快照已刷新。')
   }
   catch (cause) {
     toast.error(String(error.value ?? cause))
@@ -154,7 +154,7 @@ async function refreshSnapshotPanel() {
 async function refreshWriteReviewPanel() {
   try {
     await memoryStore.refreshWriteReview()
-    toast.success('Write review refreshed.')
+    toast.success('写回评审已刷新。')
   }
   catch (cause) {
     toast.error(String(error.value ?? cause))
@@ -164,7 +164,7 @@ async function refreshWriteReviewPanel() {
 async function clearCandidateHistoryPanel() {
   try {
     await memoryStore.clearCandidateHistory()
-    toast.success('Candidate history cleared from the desktop runtime.')
+    toast.success('桌面运行时中的候选历史已清空。')
   }
   catch (cause) {
     toast.error(String(error.value ?? cause))
@@ -307,10 +307,10 @@ onMounted(() => {
       <div :class="['flex', 'items-start', 'justify-between', 'gap-3']">
         <div :class="['flex', 'flex-col', 'gap-1']">
           <h3 :class="['text-sm', 'font-semibold']">
-            Memory Layering Mechanism
+            记忆快照与写回评审
           </h3>
           <p :class="['text-xs', 'text-neutral-500', 'dark:text-neutral-400']">
-            Read-only snapshot of the latest layering, selection, suppression, and write-back review decisions.
+            只读展示最近一次记忆快照中的分层选择、压制结果与写回评审判定。
           </p>
         </div>
 
@@ -319,7 +319,7 @@ onMounted(() => {
             variant="secondary"
             size="sm"
             :disabled="loading || refreshing || writing"
-            label="Refresh snapshot"
+            label="刷新快照"
             icon="i-solar:restart-bold-duotone"
             @click="refreshSnapshotPanel()"
           />
@@ -327,7 +327,7 @@ onMounted(() => {
             variant="secondary"
             size="sm"
             :disabled="loading || refreshing || writing"
-            label="Refresh write review"
+            label="刷新写回评审"
             icon="i-solar:clipboard-check-bold-duotone"
             @click="refreshWriteReviewPanel()"
           />
@@ -335,7 +335,7 @@ onMounted(() => {
             variant="ghost"
             size="sm"
             :disabled="loading || refreshing || writing"
-            label="Clear candidate history"
+            label="清空历史"
             icon="i-solar:trash-bin-trash-bold-duotone"
             @click="clearCandidateHistoryPanel()"
           />
@@ -344,19 +344,19 @@ onMounted(() => {
 
       <div :class="['grid', 'gap-2', 'rounded-lg', 'bg-neutral-50', 'p-3', 'text-xs', 'dark:bg-neutral-950/40', 'md:grid-cols-2']">
         <div :class="['text-neutral-600', 'dark:text-neutral-300']">
-          <span :class="['font-medium', 'text-neutral-800', 'dark:text-neutral-100']">Current layering summary:</span>
+          <span :class="['font-medium', 'text-neutral-800', 'dark:text-neutral-100']">当前摘要：</span>
           {{ turnSnapshot.summary }}
         </div>
         <div :class="['text-neutral-600', 'dark:text-neutral-300']">
-          <span :class="['font-medium', 'text-neutral-800', 'dark:text-neutral-100']">Snapshot time:</span>
+          <span :class="['font-medium', 'text-neutral-800', 'dark:text-neutral-100']">快照时间：</span>
           {{ formatTimestamp(turnSnapshot.readAt) }}
         </div>
         <div :class="['text-neutral-600', 'dark:text-neutral-300']">
-          <span :class="['font-medium', 'text-neutral-800', 'dark:text-neutral-100']">Character:</span>
+          <span :class="['font-medium', 'text-neutral-800', 'dark:text-neutral-100']">角色：</span>
           {{ turnSnapshot.characterName || activeCharacterName || t('settings.pages.memory.status.none') }}
         </div>
         <div :class="['text-neutral-600', 'dark:text-neutral-300']">
-          <span :class="['font-medium', 'text-neutral-800', 'dark:text-neutral-100']">Layers used in the latest chat:</span>
+          <span :class="['font-medium', 'text-neutral-800', 'dark:text-neutral-100']">最近一次聊天使用的层级：</span>
           {{ turnSnapshot.usedLayers.length > 0 ? turnSnapshot.usedLayers.map(formatLayerLabel).join(', ') : t('settings.pages.memory.status.none') }}
         </div>
       </div>
@@ -365,10 +365,10 @@ onMounted(() => {
         <article :class="['flex', 'flex-col', 'gap-2', 'rounded-lg', 'border', 'border-neutral-200', 'bg-neutral-50/80', 'p-3', 'dark:border-neutral-800', 'dark:bg-neutral-950/40']">
           <div :class="['flex', 'flex-col', 'gap-1']">
             <h4 :class="['text-sm', 'font-semibold']">
-              Layer Summary
+              记忆快照摘要
             </h4>
             <p :class="['text-xs', 'text-neutral-500', 'dark:text-neutral-400']">
-              Frozen layer order and per-layer decision reasons from the latest turn snapshot.
+              展示最近一次记忆快照中冻结的层级顺序，以及各层的判定原因。
             </p>
           </div>
 
@@ -387,14 +387,14 @@ onMounted(() => {
                   entry.selected ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300' : 'bg-amber-500/15 text-amber-700 dark:text-amber-300',
                 ]"
               >
-                {{ entry.selected ? 'Selected' : 'Suppressed' }}
+                {{ entry.selected ? '已选中' : '已压制' }}
               </span>
             </div>
             <div :class="['mt-1', 'text-neutral-600', 'dark:text-neutral-300']">
               {{ entry.reason.message }}
             </div>
             <div v-if="entry.documentKind" :class="['mt-1', 'text-neutral-500', 'dark:text-neutral-400']">
-              {{ entry.documentKind }} · {{ entry.evidenceCount }} evidence
+              {{ t(`settings.pages.memory.documents.${entry.documentKind}.title`) }} · {{ entry.evidenceCount }} 条证据
             </div>
             <div v-if="entry.documentSummary" :class="['mt-1', 'text-neutral-500', 'dark:text-neutral-400']">
               {{ entry.documentSummary }}
@@ -405,38 +405,38 @@ onMounted(() => {
         <article :class="['flex', 'flex-col', 'gap-2', 'rounded-lg', 'border', 'border-neutral-200', 'bg-neutral-50/80', 'p-3', 'dark:border-neutral-800', 'dark:bg-neutral-950/40']">
           <div :class="['flex', 'flex-col', 'gap-1']">
             <h4 :class="['text-sm', 'font-semibold']">
-              Latest Write Review
+              最近写回评审
             </h4>
             <p :class="['text-xs', 'text-neutral-500', 'dark:text-neutral-400']">
-              Renderer-safe review result frozen by the main process.
+              展示主进程冻结后的、可安全提供给渲染进程的写回评审结果。
             </p>
           </div>
 
           <div :class="['grid', 'gap-2', 'rounded-lg', 'bg-white/80', 'p-3', 'text-xs', 'dark:bg-neutral-900/40']">
             <div :class="['text-neutral-600', 'dark:text-neutral-300']">
-              <span :class="['font-medium', 'text-neutral-800', 'dark:text-neutral-100']">Review time:</span>
+              <span :class="['font-medium', 'text-neutral-800', 'dark:text-neutral-100']">评审时间：</span>
               {{ formatTimestamp(writeReviewSnapshot.reviewedAt) }}
             </div>
             <div :class="['text-neutral-600', 'dark:text-neutral-300']">
-              <span :class="['font-medium', 'text-neutral-800', 'dark:text-neutral-100']">Decision:</span>
+              <span :class="['font-medium', 'text-neutral-800', 'dark:text-neutral-100']">判定：</span>
               {{ formatWriteDecision(writeReviewSnapshot.decision) }}
             </div>
             <div :class="['text-neutral-600', 'dark:text-neutral-300']">
-              <span :class="['font-medium', 'text-neutral-800', 'dark:text-neutral-100']">Reason:</span>
+              <span :class="['font-medium', 'text-neutral-800', 'dark:text-neutral-100']">原因：</span>
               {{ writeReviewSnapshot.reason.message }}
             </div>
             <div :class="['text-neutral-600', 'dark:text-neutral-300']">
-              <span :class="['font-medium', 'text-neutral-800', 'dark:text-neutral-100']">Summary:</span>
+              <span :class="['font-medium', 'text-neutral-800', 'dark:text-neutral-100']">摘要：</span>
               {{ writeReviewSnapshot.summary }}
             </div>
           </div>
 
           <div v-if="latestPersistedWrite" :class="['rounded-lg', 'border', 'border-neutral-200', 'bg-white/80', 'p-3', 'text-xs', 'dark:border-neutral-800', 'dark:bg-neutral-900/40']">
             <div :class="['font-medium', 'text-neutral-800', 'dark:text-neutral-100']">
-              Latest persisted write
+              最近写回
             </div>
             <div :class="['mt-1', 'text-neutral-600', 'dark:text-neutral-300']">
-              {{ latestPersistedWrite.kind }} · {{ formatLayerLabel(latestPersistedWrite.layer) }}
+              {{ t(`settings.pages.memory.documents.${latestPersistedWrite.kind}.title`) }} · {{ formatLayerLabel(latestPersistedWrite.layer) }}
             </div>
             <div :class="['mt-1', 'text-neutral-600', 'dark:text-neutral-300']">
               {{ formatWriteDecision(latestPersistedWrite.decision) }} · {{ formatTimestamp(latestPersistedWrite.writtenAt) }}
@@ -456,16 +456,16 @@ onMounted(() => {
               :class="['rounded-lg', 'border', 'border-neutral-200', 'bg-white/80', 'p-3', 'text-xs', 'dark:border-neutral-800', 'dark:bg-neutral-900/40']"
             >
               <div :class="['font-medium', 'text-neutral-800', 'dark:text-neutral-100']">
-                {{ candidate.kind }} · {{ formatLayerLabel(candidate.layer) }}
+                {{ t(`settings.pages.memory.documents.${candidate.kind}.title`) }} · {{ formatLayerLabel(candidate.layer) }}
               </div>
               <div :class="['mt-1', 'text-neutral-600', 'dark:text-neutral-300']">
                 {{ candidate.summary }}
               </div>
               <div v-if="candidate.addItems.length > 0" :class="['mt-2', 'text-neutral-500', 'dark:text-neutral-400']">
-                Add: {{ candidate.addItems.join(' | ') }}
+                新增：{{ candidate.addItems.join(' | ') }}
               </div>
               <div v-if="candidate.removeItems.length > 0" :class="['mt-1', 'text-neutral-500', 'dark:text-neutral-400']">
-                Remove: {{ candidate.removeItems.join(' | ') }}
+                移除：{{ candidate.removeItems.join(' | ') }}
               </div>
             </div>
           </div>
@@ -474,7 +474,7 @@ onMounted(() => {
             v-else
             :class="['text-xs', 'text-neutral-500', 'dark:text-neutral-400']"
           >
-            No candidate history is currently shown in this view.
+            当前视图暂无候选历史。
           </div>
         </article>
       </div>
@@ -483,10 +483,10 @@ onMounted(() => {
         <article :class="['flex', 'flex-col', 'gap-2', 'rounded-lg', 'border', 'border-neutral-200', 'bg-neutral-50/80', 'p-3', 'dark:border-neutral-800', 'dark:bg-neutral-950/40']">
           <div :class="['flex', 'flex-col', 'gap-1']">
             <h4 :class="['text-sm', 'font-semibold']">
-              Latest Selected Entries
+              最近一次已选条目
             </h4>
             <p :class="['text-xs', 'text-neutral-500', 'dark:text-neutral-400']">
-              Entries that survived layering selection in the latest snapshot.
+              展示最近一次记忆快照中通过分层选择的条目。
             </p>
           </div>
 
@@ -506,7 +506,7 @@ onMounted(() => {
                 {{ entry.text }}
               </div>
               <div :class="['mt-1', 'text-neutral-500', 'dark:text-neutral-400']">
-                Reason: {{ entry.reason.message }}
+                原因：{{ entry.reason.message }}
               </div>
             </div>
           </div>
@@ -515,17 +515,17 @@ onMounted(() => {
             v-else
             :class="['text-xs', 'text-neutral-500', 'dark:text-neutral-400']"
           >
-            No selected entries were frozen in the latest snapshot.
+            最近一次记忆快照没有冻结任何已选条目。
           </div>
         </article>
 
         <article :class="['flex', 'flex-col', 'gap-2', 'rounded-lg', 'border', 'border-neutral-200', 'bg-neutral-50/80', 'p-3', 'dark:border-neutral-800', 'dark:bg-neutral-950/40']">
           <div :class="['flex', 'flex-col', 'gap-1']">
             <h4 :class="['text-sm', 'font-semibold']">
-              Latest Suppressed Entries
+              最近一次已压制条目
             </h4>
             <p :class="['text-xs', 'text-neutral-500', 'dark:text-neutral-400']">
-              Entries that were considered but suppressed by layering decisions.
+              展示最近一次记忆快照中被纳入考虑但最终被压制的条目。
             </p>
           </div>
 
@@ -545,7 +545,7 @@ onMounted(() => {
                 {{ entry.text }}
               </div>
               <div :class="['mt-1', 'text-neutral-500', 'dark:text-neutral-400']">
-                Reason: {{ entry.reason.message }}
+                原因：{{ entry.reason.message }}
               </div>
             </div>
           </div>
@@ -554,7 +554,7 @@ onMounted(() => {
             v-else
             :class="['text-xs', 'text-neutral-500', 'dark:text-neutral-400']"
           >
-            No suppressed entries were frozen in the latest snapshot.
+            最近一次记忆快照没有冻结任何已压制条目。
           </div>
         </article>
       </div>
@@ -576,7 +576,7 @@ onMounted(() => {
           {{ t(`settings.pages.memory.documents.${latestWrite.kind}.title`) }}
         </div>
         <div :class="['text-neutral-600', 'dark:text-neutral-300']">
-          <span :class="['font-medium', 'text-neutral-800', 'dark:text-neutral-100']">Decision:</span>
+          <span :class="['font-medium', 'text-neutral-800', 'dark:text-neutral-100']">判定：</span>
           {{ formatWriteDecision(latestWrite.decision) }}
         </div>
         <div :class="['text-neutral-600', 'dark:text-neutral-300']">

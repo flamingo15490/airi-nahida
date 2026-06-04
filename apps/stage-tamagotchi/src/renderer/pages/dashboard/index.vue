@@ -27,25 +27,37 @@ const statusToneMap = {
 
 const dashboardStatusLabel = computed(() => {
   if (snapshot.value.status === 'ready') {
-    return 'Aligned'
+    return '已对齐'
   }
 
   if (snapshot.value.status === 'attention') {
-    return 'Needs Attention'
+    return '需关注'
   }
 
-  return 'Inactive'
+  return '未启用'
 })
 
 function formatTimestamp(value?: number) {
   if (!value) {
-    return 'Not tracked'
+    return '未记录'
   }
 
   return new Intl.DateTimeFormat(undefined, {
     dateStyle: 'medium',
     timeStyle: 'short',
   }).format(value)
+}
+
+function formatSurfaceStatus(status: 'ready' | 'attention' | 'inactive') {
+  if (status === 'ready') {
+    return '已对齐'
+  }
+
+  if (status === 'attention') {
+    return '需关注'
+  }
+
+  return '未启用'
 }
 
 async function refreshSnapshot() {
@@ -78,13 +90,13 @@ async function openSurfaceDetail(surface: 'memory' | 'persona' | 'proactive') {
               {{ dashboardStatusLabel }}
             </span>
             <span :class="['text-xs', 'font-medium', 'tracking-[0.22em]', 'text-neutral-500', 'uppercase', 'dark:text-neutral-400']">
-              Phase 6 Coordination
+              第六阶段协同
             </span>
           </div>
 
           <div :class="['flex', 'flex-col', 'gap-2']">
             <h1 :class="['font-serif', 'text-3xl', 'leading-tight', 'sm:text-4xl']">
-              Companion Coordination Overview
+              协同总览
             </h1>
             <p :class="['max-w-3xl', 'text-sm', 'leading-6', 'text-neutral-600', 'dark:text-neutral-300']">
               {{ snapshot.summary }}
@@ -103,7 +115,7 @@ async function openSurfaceDetail(surface: 'memory' | 'persona' | 'proactive') {
               :class="['inline-flex', 'items-center', 'rounded-full', 'border', 'border-emerald-300/70', 'bg-emerald-50/80', 'px-4', 'py-2', 'text-sm', 'font-medium', 'text-emerald-800', 'transition', 'disabled:cursor-not-allowed', 'disabled:opacity-60', 'dark:border-emerald-900/60', 'dark:bg-emerald-950/30', 'dark:text-emerald-200']"
               @click="refreshSnapshot"
             >
-              {{ refreshing ? 'Refreshing...' : 'Refresh Snapshot' }}
+              {{ refreshing ? '刷新中...' : '刷新快照' }}
             </button>
             <button
               type="button"
@@ -111,14 +123,14 @@ async function openSurfaceDetail(surface: 'memory' | 'persona' | 'proactive') {
               :class="['inline-flex', 'items-center', 'rounded-full', 'border', 'border-neutral-300/70', 'bg-white/80', 'px-4', 'py-2', 'text-sm', 'font-medium', 'text-neutral-700', 'transition', 'disabled:cursor-not-allowed', 'disabled:opacity-60', 'dark:border-neutral-700', 'dark:bg-neutral-900/40', 'dark:text-neutral-200']"
               @click="clearCoordinationHistory"
             >
-              {{ clearing ? 'Clearing...' : 'Clear History' }}
+              {{ clearing ? '清空中...' : '清空历史' }}
             </button>
           </div>
 
           <div :class="['grid', 'gap-3', 'sm:grid-cols-3', 'lg:grid-cols-1']">
             <div :class="['rounded-2xl', 'border', 'border-emerald-200/70', 'bg-emerald-50/75', 'p-4', 'dark:border-emerald-900/50', 'dark:bg-emerald-950/20']">
               <div :class="['text-xs', 'font-medium', 'tracking-[0.18em]', 'text-emerald-700', 'uppercase', 'dark:text-emerald-300']">
-                Ready
+                已对齐
               </div>
               <div :class="['mt-2', 'text-3xl', 'font-semibold']">
                 {{ snapshot.readyCount }}
@@ -126,7 +138,7 @@ async function openSurfaceDetail(surface: 'memory' | 'persona' | 'proactive') {
             </div>
             <div :class="['rounded-2xl', 'border', 'border-orange-200/70', 'bg-orange-50/75', 'p-4', 'dark:border-orange-900/50', 'dark:bg-orange-950/20']">
               <div :class="['text-xs', 'font-medium', 'tracking-[0.18em]', 'text-orange-700', 'uppercase', 'dark:text-orange-300']">
-                Attention
+                需关注
               </div>
               <div :class="['mt-2', 'text-3xl', 'font-semibold']">
                 {{ snapshot.attentionCount }}
@@ -134,7 +146,7 @@ async function openSurfaceDetail(surface: 'memory' | 'persona' | 'proactive') {
             </div>
             <div :class="['rounded-2xl', 'border', 'border-neutral-200/70', 'bg-neutral-100/80', 'p-4', 'dark:border-neutral-800', 'dark:bg-neutral-900/50']">
               <div :class="['text-xs', 'font-medium', 'tracking-[0.18em]', 'text-neutral-600', 'uppercase', 'dark:text-neutral-400']">
-                Inactive
+                未启用
               </div>
               <div :class="['mt-2', 'text-3xl', 'font-semibold']">
                 {{ snapshot.inactiveCount }}
@@ -169,14 +181,14 @@ async function openSurfaceDetail(surface: 'memory' | 'persona' | 'proactive') {
                 ...statusToneMap[surface.status].badge,
               ]"
             >
-              {{ surface.status }}
+              {{ formatSurfaceStatus(surface.status) }}
             </span>
           </div>
 
           <div :class="['space-y-3', 'text-sm', 'leading-6']">
             <div>
               <div :class="['text-[11px]', 'font-medium', 'tracking-[0.18em]', 'text-neutral-500', 'uppercase', 'dark:text-neutral-400']">
-                Reason
+                原因
               </div>
               <p :class="['mt-1', 'text-neutral-700', 'dark:text-neutral-200']">
                 {{ surface.overview.reason }}
@@ -185,7 +197,7 @@ async function openSurfaceDetail(surface: 'memory' | 'persona' | 'proactive') {
 
             <div>
               <div :class="['text-[11px]', 'font-medium', 'tracking-[0.18em]', 'text-neutral-500', 'uppercase', 'dark:text-neutral-400']">
-                Activity
+                最近活动
               </div>
               <p :class="['mt-1', 'text-neutral-700', 'dark:text-neutral-200']">
                 {{ surface.overview.activity }}
@@ -194,7 +206,7 @@ async function openSurfaceDetail(surface: 'memory' | 'persona' | 'proactive') {
 
             <div>
               <div :class="['text-[11px]', 'font-medium', 'tracking-[0.18em]', 'text-neutral-500', 'uppercase', 'dark:text-neutral-400']">
-                Coverage
+                覆盖情况
               </div>
               <p :class="['mt-1', 'text-neutral-700', 'dark:text-neutral-200']">
                 {{ surface.overview.coverage }}
@@ -204,13 +216,13 @@ async function openSurfaceDetail(surface: 'memory' | 'persona' | 'proactive') {
 
           <div :class="['mt-auto', 'border-t', 'border-black/6', 'pt-3', 'text-xs', 'text-neutral-500', 'dark:border-white/8', 'dark:text-neutral-400']">
             <div :class="['flex', 'items-center', 'justify-between', 'gap-3']">
-              <span>Updated: {{ formatTimestamp(surface.overview.updatedAt) }}</span>
+              <span>更新时间：{{ formatTimestamp(surface.overview.updatedAt) }}</span>
               <button
                 type="button"
                 :class="['inline-flex', 'items-center', 'rounded-full', 'border', 'border-black/10', 'bg-white/60', 'px-3', 'py-1.5', 'text-[11px]', 'font-semibold', 'tracking-[0.08em]', 'uppercase', 'text-neutral-700', 'transition', 'hover:bg-white/90', 'dark:border-white/10', 'dark:bg-black/20', 'dark:text-neutral-200', 'dark:hover:bg-black/35']"
                 @click="openSurfaceDetail(surface.surface)"
               >
-                Open Detail
+                打开详情
               </button>
             </div>
           </div>
