@@ -30,6 +30,12 @@ const settings = computed(() => [
     icon: 'i-solar:code-bold-duotone',
     to: '/settings/system/developer',
   },
+  {
+    title: t('settings.pages.system.health.title'),
+    description: t('settings.pages.system.health.description'),
+    icon: 'i-solar:heart-pulse-2-bold-duotone',
+    to: '/settings/system/health',
+  },
 ])
 </script>
 

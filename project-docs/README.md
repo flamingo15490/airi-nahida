@@ -16,4 +16,4 @@ Centralized project documents for the AIRI Nahida custom source branch.
 ## Notes
 
 - These files were moved under `project-docs/` to keep the repository root cleaner.
-- The document contents remain the same; only their location is consolidated.
+- The document set should be kept in sync with the latest accepted custom stage baseline.

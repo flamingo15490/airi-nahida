@@ -1703,6 +1703,86 @@ pages:
     general:
       description: Dark theme, languages, etc.
       title: General
+    health:
+      title: System Health
+      description: Review the unified desktop health snapshot, subsystem status, and startup diagnostics.
+      error-title: System health error
+      actions:
+        refresh: Refresh snapshot
+        run-diagnostics: Run startup diagnostics
+        view-details: View details
+        ignore-alert: Ignore
+        open-related-settings: Open related settings
+      loading:
+        title: Loading health snapshot
+        description: AIRI is fetching the latest system health from the desktop runtime.
+      overview:
+        title: Unified health snapshot
+        description: This view mirrors the main-process health contract without re-deriving the overall status in the renderer.
+        overall-label: Overall status
+        checked-at-label: Snapshot checked at
+        subsystems-label: Tracked subsystems
+        subsystems-count: '{count} subsystems reported'
+      startup-phase:
+        in-progress: Startup phase in progress
+        completed: Startup phase completed
+      startup-alert:
+        title: Startup diagnostics found issues
+        description: Startup diagnostics found {count} issues. Open System Health to review the failures.
+      quick-summary:
+        loading: AIRI is loading the latest system health snapshot for this settings view.
+        startup: Startup diagnostics are still running for this desktop session.
+        healthy: All tracked desktop subsystems look healthy right now.
+        degraded: Some tracked desktop subsystems need attention, but AIRI is still running.
+        unhealthy: Startup diagnostics or live probes found failures that need attention.
+        unknown: System health has not gathered enough signals yet.
+      status:
+        healthy: Healthy
+        degraded: Degraded
+        unhealthy: Unhealthy
+        unknown: Unknown
+      fields:
+        summary: Summary
+        detail: Detail
+        action-hint: Suggested action
+        checked-at: Checked at
+      empty:
+        subsystems: No subsystem probes have been reported yet.
+        timestamp: Not available yet
+      subsystems-panel:
+        title: Subsystem probes
+        description: Each subsystem entry comes directly from the frozen shared health probe contract.
+      diagnostics:
+        title: Startup diagnostics
+        description: Run the frozen startup diagnostics sequence and inspect warnings, failures, and total duration.
+        idle: Not run yet
+        passed: Passed
+        failed: Failed
+        duration: Duration
+        warnings-title: '{count} warnings'
+        failures-title: '{count} failures'
+        no-warnings: No warnings were reported in the latest startup diagnostics run.
+        no-failures: No failures were reported in the latest startup diagnostics run.
+        empty: Startup diagnostics have not been run in this renderer session yet.
+      subsystems:
+        memory:
+          title: Memory
+          description: External memory bridge and persistence health.
+        persona:
+          title: Persona
+          description: Persona expression layer readiness and consistency.
+        proactive:
+          title: Proactive Companion
+          description: Proactive governance and reminder delivery health.
+        coordination:
+          title: Coordination
+          description: Cross-surface coordination state between shared runtime modules.
+        integrations:
+          title: Integrations
+          description: External bridge and module integration readiness.
+        vision:
+          title: Vision
+          description: Vision capture, runner, and analysis subsystem state.
     description: Customize your stage!
     sections:
       section:

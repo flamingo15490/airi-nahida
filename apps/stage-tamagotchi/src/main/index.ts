@@ -41,6 +41,7 @@ import { setupMcpStdioManager } from './services/airi/mcp-servers'
 import { createNahidaPersonaManager } from './services/airi/nahida-persona'
 import { setupPluginHost } from './services/airi/plugins'
 import { createProactiveCompanionManager } from './services/airi/proactive-companion'
+import { createSystemHealthManager, createSystemHealthService } from './services/airi/system-health'
 import { setupArtistryBridge } from './services/airi/widgets/artistry-bridge'
 import { setupAutoUpdater } from './services/electron/auto-updater'
 import { setupGlobalShortcutService } from './services/electron/global-shortcut'
@@ -234,6 +235,24 @@ app.whenReady().then(async () => {
       proactiveCompanionManager: dependsOn.proactiveCompanionManager,
     }),
   })
+  const systemHealthManager = injeca.provide('modules:system-health-manager', {
+    dependsOn: {
+      companionCoordinationManager,
+      externalIntegrationsManager,
+      externalMemoryManager,
+      godotStageManager,
+      nahidaPersonaManager,
+      proactiveCompanionManager,
+    },
+    build: async ({ dependsOn }) => createSystemHealthManager({
+      companionCoordinationManager: dependsOn.companionCoordinationManager,
+      externalIntegrationsManager: dependsOn.externalIntegrationsManager,
+      externalMemoryManager: dependsOn.externalMemoryManager,
+      godotStageManager: dependsOn.godotStageManager,
+      nahidaPersonaManager: dependsOn.nahidaPersonaManager,
+      proactiveCompanionManager: dependsOn.proactiveCompanionManager,
+    }),
+  })
 
   const widgetsManager = injeca.provide('windows:widgets', {
     dependsOn: { serverChannel, i18n },
@@ -316,7 +335,7 @@ app.whenReady().then(async () => {
   }
 
   injeca.invoke({
-    dependsOn: { mainWindow, tray, serverChannel, airiHttpServer, godotStageManager, pluginHost, mcpStdioManager, onboardingWindow: onboardingWindowManager, widgetsWindow: widgetsManager, artistryConfig },
+    dependsOn: { mainWindow, tray, serverChannel, airiHttpServer, godotStageManager, pluginHost, mcpStdioManager, onboardingWindow: onboardingWindowManager, widgetsWindow: widgetsManager, artistryConfig, systemHealthManager },
     callback: async (deps) => {
       const { context } = createContext(ipcMain)
       await setupArtistryBridge({
@@ -324,10 +343,14 @@ app.whenReady().then(async () => {
         context,
         artistryConfig: deps.artistryConfig,
       })
+      createSystemHealthService({
+        manager: deps.systemHealthManager,
+      })
     },
   })
 
-  injeca.start().catch(err => console.error(err))
+  void injeca.start()
+    .catch(err => console.error(err))
 
   // Lifecycle
   emitAppReady()

@@ -1,14 +1,19 @@
 <script setup lang="ts">
 import { IconItem } from '@proj-airi/stage-ui/components'
 import { useSettings } from '@proj-airi/stage-ui/stores/settings'
-import { computed, ref } from 'vue'
+import { storeToRefs } from 'pinia'
+import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
+
+import { useSystemHealthSettingsStore } from '../../stores/settings/system-health'
 
 const router = useRouter()
 const resolveAnimation = ref<() => void>()
 const { t } = useI18n()
 const settingsStore = useSettings()
+const systemHealthStore = useSystemHealthSettingsStore()
+const { hasLoaded, loading, snapshot } = storeToRefs(systemHealthStore)
 
 const removeBeforeEach = router.beforeEach(async (_, __, next) => {
   if (!settingsStore.usePageSpecificTransitions || settingsStore.disableTransitions) {
@@ -35,12 +40,52 @@ const settings = computed(() => {
       to: route.path,
     }))
 })
+
+const healthSummary = computed(() => {
+  const overall = t(`settings.pages.system.health.status.${snapshot.value.overall}`)
+  const title = `${t('settings.pages.system.health.title')} - ${overall}`
+
+  if (!hasLoaded.value && loading.value) {
+    return {
+      title,
+      description: t('settings.pages.system.health.quick-summary.loading'),
+    }
+  }
+
+  if (snapshot.value.startupPhase) {
+    return {
+      title,
+      description: t('settings.pages.system.health.quick-summary.startup'),
+    }
+  }
+
+  return {
+    title,
+    description: t(`settings.pages.system.health.quick-summary.${snapshot.value.overall}`),
+  }
+})
+
+onMounted(() => {
+  if (!hasLoaded.value) {
+    void systemHealthStore.loadSnapshot({ notify: false })
+  }
+})
 </script>
 
 <template>
   <div flex="~ col gap-4" font-normal>
     <div />
     <div flex="~ col gap-4" pb-12>
+      <IconItem
+        v-motion
+        :initial="{ opacity: 0, y: 10 }"
+        :enter="{ opacity: 1, y: 0 }"
+        :duration="250"
+        :title="healthSummary.title"
+        :description="healthSummary.description"
+        icon="i-solar:heart-pulse-2-bold-duotone"
+        to="/settings/system/health"
+      />
       <IconItem
         v-for="(setting, index) in settings"
         :key="setting.to"
@@ -49,7 +94,7 @@ const settings = computed(() => {
         :enter="{ opacity: 1, y: 0 }"
         :duration="250"
         :style="{
-          transitionDelay: `${index * 50}ms`, // delay between each item, unocss doesn't support dynamic generation of classes now
+          transitionDelay: `${(index + 1) * 50}ms`, // delay between each item, unocss doesn't support dynamic generation of classes now
         }"
         :title="setting.title"
         :description="setting.description"

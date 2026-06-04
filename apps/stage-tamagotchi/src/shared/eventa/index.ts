@@ -48,6 +48,10 @@ import type {
   ProactiveCompanionSettings,
   ProactiveCompanionSparkNotifyInput,
 } from '../proactive-companion'
+import type {
+  StartupDiagnosticsResult,
+  SystemHealthSnapshot,
+} from '../system-health'
 
 import { defineEventa, defineInvokeEventa } from '@moeru/eventa'
 
@@ -94,6 +98,10 @@ export const electronCompanionCoordinationGetSnapshot = defineInvokeEventa<Compa
 export const electronCompanionCoordinationRefresh = defineInvokeEventa<CompanionCoordinationSnapshot, CompanionCoordinationRefreshRequest | undefined>('eventa:invoke:electron:companion-coordination:refresh')
 export const electronCompanionCoordinationClearHistory = defineInvokeEventa<CompanionCoordinationSnapshot, CompanionCoordinationRefreshRequest | undefined>('eventa:invoke:electron:companion-coordination:clear-history')
 export const electronCompanionCoordinationRefreshForSparkNotify = defineInvokeEventa<CompanionCoordinationSparkNotifyResult, CompanionCoordinationRefreshRequest | undefined>('eventa:invoke:electron:companion-coordination:refresh-for-spark-notify')
+
+export const electronSystemHealthGetSnapshot = defineInvokeEventa<SystemHealthSnapshot>('eventa:invoke:electron:system-health:get-snapshot')
+export const electronSystemHealthRefresh = defineInvokeEventa<SystemHealthSnapshot>('eventa:invoke:electron:system-health:refresh')
+export const electronSystemHealthRunStartupDiagnostics = defineInvokeEventa<StartupDiagnosticsResult>('eventa:invoke:electron:system-health:run-startup-diagnostics')
 
 export type ElectronUpdaterChannel = 'latest' | 'stable' | 'alpha' | 'beta' | 'nightly' | 'canary'
 

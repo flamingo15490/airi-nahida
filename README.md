@@ -11,6 +11,7 @@ Current direction:
 - Preserve the existing external service architecture
 - Improve source-level stability before large-scale expansion
 - Build a cleaner foundation for a Nahida-style personalized companion
+- Reduce day-to-day maintenance and diagnosis cost for local use
 
 ## Current Focus
 
@@ -54,16 +55,18 @@ Implemented and already integrated into the source tree:
 - Nahida persona layer with clearer structured boundaries
 - Proactive companion governance layer with event history, cooldown control, and explainable decisions
 - Companion coordination layer that aligns memory, persona, and proactive state through one shared snapshot and overview surface
+- System health layer with unified probes, startup diagnostics, quick settings summary, and a single daily-use launcher
 
 ## Current Status
 
-The main body of the first six custom stages is now in place:
+The main body of the first seven custom stages is now in place:
 - source stabilization
 - local integration stabilization
 - Nahida persona layer
 - external memory loop
 - proactive companion governance
 - coordination judgment and overview layer
+- system health and daily operations closure
 
 At this point, the repository is no longer just a loose patch stack. It already has a clearer custom baseline for future iteration.
 
@@ -103,4 +106,5 @@ For PR #1 acceptance, a dedicated acceptance worktree / launcher path is also us
 - This repository intentionally follows a conservative staged-integration path.
 - Large architectural rewrites are not the current priority.
 - The current phase-six baseline already unifies memory, persona, and proactive state through a shared coordination layer.
+- The current phase-seven baseline also adds a unified health surface and lower-friction startup flow.
 - The next natural step is to deepen cooperation quality and reduce day-to-day maintenance cost rather than expanding infrastructure blindly.

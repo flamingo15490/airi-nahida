@@ -22,9 +22,10 @@ import { usePerfTracerBridgeStore } from '@proj-airi/stage-ui/stores/perf-tracer
 import { listProvidersForPluginHost, shouldPublishPluginHostCapabilities } from '@proj-airi/stage-ui/stores/plugin-host-capabilities'
 import { useProactiveCompanionStore } from '@proj-airi/stage-ui/stores/proactive-companion-store'
 import { useSettings, useSettingsAudioDevice } from '@proj-airi/stage-ui/stores/settings'
-import { useTheme } from '@proj-airi/ui'
+import { Button, useTheme } from '@proj-airi/ui'
 import { storeToRefs } from 'pinia'
-import { onMounted, onUnmounted, watch } from 'vue'
+import { computed, onMounted, onUnmounted, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { RouterView, useRoute, useRouter } from 'vue-router'
 import { toast, Toaster } from 'vue-sonner'
 
@@ -81,14 +82,18 @@ import { createChatSyncWindowLifecycle } from './stores/chat-sync-lifecycle'
 import { useTamagotchiMcpToolsStore } from './stores/mcp-tools'
 import { useTamagotchiPluginToolsStore } from './stores/plugin-tools'
 import { useServerChannelSettingsStore } from './stores/settings/server-channel'
+import { useSystemHealthSettingsStore } from './stores/settings/system-health'
 import { useStageWindowLifecycleStore } from './stores/stage-window-lifecycle'
 
 const { isDark: dark } = useTheme()
+const { t } = useI18n()
 const contextBridgeStore = useContextBridgeStore()
 const displayModelsStore = useDisplayModelsStore()
 const settingsStore = useSettings()
 const { language, themeColorsHue, themeColorsHueDynamic } = storeToRefs(settingsStore)
 const serverChannelSettingsStore = useServerChannelSettingsStore()
+const systemHealthStore = useSystemHealthSettingsStore()
+const { shouldShowStartupAlert, startupDiagnosticsFailureCount } = storeToRefs(systemHealthStore)
 const router = useRouter()
 const route = useRoute()
 const cardStore = useAiriCardStore()
@@ -155,6 +160,14 @@ const isChatWindowRoute = () => route.path === '/chat'
 const isGodotStageRoute = () => route.path === '/' || route.path.startsWith('/settings')
 const isVisionOwnerRoute = () => route.path === '/'
 const isWidgetsWindowRoute = () => route.path === '/widgets'
+const showStartupDiagnosticsBanner = computed(() => {
+  return shouldShowStartupAlert.value && isGodotStageRoute() && !isWidgetsWindowRoute()
+})
+const startupDiagnosticsBannerMessage = computed(() => {
+  return t('settings.pages.system.health.startup-alert.description', {
+    count: startupDiagnosticsFailureCount.value,
+  })
+})
 
 async function recordProactiveCompanionContextUpdates(
   updates: Array<Record<string, unknown>> | undefined,
@@ -238,6 +251,12 @@ async function startBackgroundVisionIfEnabled() {
   if (!started && visionRunner.errorMessage.value) {
     console.warn('[App] Failed to auto-start vision runner:', visionRunner.errorMessage.value)
   }
+}
+
+function openSystemHealthPage() {
+  void router.push('/settings/system/health').catch((error) => {
+    console.warn('[App] Failed to navigate to system health page:', error)
+  })
 }
 
 watch(() => route.path, () => {
@@ -355,6 +374,12 @@ context.value.on(electronGodotStageStatusChanged, (event) => {
 
 onMounted(async () => {
   chatSyncLifecycle.initialize()
+
+  if (isGodotStageRoute() && !isWidgetsWindowRoute()) {
+    void systemHealthStore.ensureStartupDiagnostics().catch((error) => {
+      console.warn('[App] Failed to run startup diagnostics automatically:', error)
+    })
+  }
 
   // NOTICE: Issue #1658
   // When Electron restarts, renderer localStorage may not be flushed to disk.
@@ -512,6 +537,45 @@ onUnmounted(() => {
     <Toaster />
   </ToasterRoot>
   <ResizeHandler />
+  <div
+    v-if="showStartupDiagnosticsBanner"
+    :class="['pointer-events-none', 'fixed', 'left-0', 'right-0', 'top-4', 'z-50', 'px-4']"
+  >
+    <section
+      :class="[
+        'pointer-events-auto', 'mx-auto', 'flex', 'max-w-5xl', 'flex-col', 'gap-3',
+        'rounded-2xl', 'border', 'border-orange-200/80', 'bg-orange-50/95', 'p-4',
+        'shadow-[0_18px_48px_rgba(120,53,15,0.18)]', 'backdrop-blur-md',
+        'dark:border-orange-900/70', 'dark:bg-orange-950/85',
+        'lg:flex-row', 'lg:items-center', 'lg:justify-between',
+      ]"
+    >
+      <div :class="['flex', 'flex-col', 'gap-1']">
+        <div :class="['text-sm', 'font-semibold', 'text-orange-950', 'dark:text-orange-50']">
+          {{ t('settings.pages.system.health.startup-alert.title') }}
+        </div>
+        <p :class="['text-sm', 'leading-6', 'text-orange-900/85', 'dark:text-orange-100/80']">
+          {{ startupDiagnosticsBannerMessage }}
+        </p>
+      </div>
+
+      <div :class="['flex', 'flex-wrap', 'gap-2']">
+        <Button
+          variant="secondary"
+          size="sm"
+          icon="i-solar:heart-pulse-2-bold-duotone"
+          :label="t('settings.pages.system.health.actions.view-details')"
+          @click="openSystemHealthPage()"
+        />
+        <Button
+          variant="ghost"
+          size="sm"
+          :label="t('settings.pages.system.health.actions.ignore-alert')"
+          @click="systemHealthStore.dismissStartupAlert()"
+        />
+      </div>
+    </section>
+  </div>
   <RouterView />
 </template>
 
