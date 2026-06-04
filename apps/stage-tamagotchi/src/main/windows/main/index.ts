@@ -4,6 +4,7 @@ import type { InferOutput } from 'valibot'
 import type { I18n } from '../../libs/i18n'
 import type { WindowAuthManager } from '../../services/airi/auth'
 import type { ServerChannel } from '../../services/airi/channel-server'
+import type { CompanionCoordinationManager } from '../../services/airi/companion-coordination'
 import type { ExternalIntegrationsManager } from '../../services/airi/external-integrations'
 import type { ExternalMemoryManager } from '../../services/airi/external-memory'
 import type { GodotStageManager } from '../../services/airi/godot-stage'
@@ -67,6 +68,7 @@ export async function setupMainWindow(params: {
   proactiveCompanionManager: ProactiveCompanionManager
   externalMemoryManager: ExternalMemoryManager
   nahidaPersonaManager: NahidaPersonaManager
+  companionCoordinationManager: CompanionCoordinationManager
   i18n: I18n
   onboardingWindowManager: OnboardingWindowManager
   windowAuthManager: WindowAuthManager
@@ -198,6 +200,7 @@ export async function setupMainWindow(params: {
     proactiveCompanionManager: params.proactiveCompanionManager,
     externalMemoryManager: params.externalMemoryManager,
     nahidaPersonaManager: params.nahidaPersonaManager,
+    companionCoordinationManager: params.companionCoordinationManager,
     i18n: params.i18n,
     onboardingWindowManager: params.onboardingWindowManager,
     windowAuthManager: params.windowAuthManager,

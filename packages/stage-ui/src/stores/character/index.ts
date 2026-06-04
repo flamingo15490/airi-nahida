@@ -5,6 +5,7 @@ import { defineStore, storeToRefs } from 'pinia'
 import { computed, reactive, ref } from 'vue'
 
 import { useLlmmarkerParser } from '../../composables/llm-marker-parser'
+import { useCompanionCoordinationStore } from '../companion-coordination-store'
 import { useExternalMemoryStore } from '../external-memory-store'
 import { useAiriCardStore } from '../modules'
 import { joinPromptSections } from '../nahida-persona'
@@ -38,6 +39,7 @@ export function setCharacterLlmMarkerParserFactoryForTest(factory: ParserFactory
 
 export const useCharacterStore = defineStore('character', () => {
   const { activeCard, systemPrompt } = storeToRefs(useAiriCardStore())
+  const coordinationStore = useCompanionCoordinationStore()
   const externalMemoryStore = useExternalMemoryStore()
   const nahidaPersonaStore = useNahidaPersonaStore()
 
@@ -47,6 +49,7 @@ export const useCharacterStore = defineStore('character', () => {
     systemPrompt.value,
     externalMemoryStore.activeSupplement,
     nahidaPersonaStore.activeSupplement,
+    coordinationStore.activeSupplement,
   ))
 
   const reactions = ref<CharacterSparkNotifyReaction[]>([])

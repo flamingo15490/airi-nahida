@@ -1,4 +1,5 @@
 export * from './background'
+export * from './companion-coordination-store'
 export * from './display-models'
 // NOTICE: `@proj-airi/stage-ui/stores` remains a valid package export path.
 // Keep this barrel file pointing at real store modules so package resolution

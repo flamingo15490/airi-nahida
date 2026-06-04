@@ -32,6 +32,7 @@ import { setElectronMainDirname } from './libs/electron/location'
 import { createI18n } from './libs/i18n'
 import { createWindowAuthManagerService } from './services/airi/auth'
 import { setupServerChannel } from './services/airi/channel-server'
+import { createCompanionCoordinationManager } from './services/airi/companion-coordination'
 import { createExternalIntegrationsManager } from './services/airi/external-integrations'
 import { createExternalMemoryManager } from './services/airi/external-memory'
 import { setupGodotStageManager } from './services/airi/godot-stage'
@@ -225,6 +226,14 @@ app.whenReady().then(async () => {
       externalIntegrationsManager: dependsOn.externalIntegrationsManager,
     }),
   })
+  const companionCoordinationManager = injeca.provide('modules:companion-coordination-manager', {
+    dependsOn: { externalMemoryManager, nahidaPersonaManager, proactiveCompanionManager },
+    build: async ({ dependsOn }) => createCompanionCoordinationManager({
+      externalMemoryManager: dependsOn.externalMemoryManager,
+      nahidaPersonaManager: dependsOn.nahidaPersonaManager,
+      proactiveCompanionManager: dependsOn.proactiveCompanionManager,
+    }),
+  })
 
   const widgetsManager = injeca.provide('windows:widgets', {
     dependsOn: { serverChannel, i18n },
@@ -266,12 +275,12 @@ app.whenReady().then(async () => {
   })
 
   const settingsWindow = injeca.provide('windows:settings', {
-    dependsOn: { widgetsManager, beatSync, autoUpdater, devtoolsWindow: devtoolsMarkdownStressWindow, serverChannel, godotStageManager, mcpStdioManager, externalIntegrationsManager, proactiveCompanionManager, externalMemoryManager, nahidaPersonaManager, i18n, windowAuthManager, globalShortcut },
+    dependsOn: { widgetsManager, beatSync, autoUpdater, devtoolsWindow: devtoolsMarkdownStressWindow, serverChannel, godotStageManager, mcpStdioManager, externalIntegrationsManager, proactiveCompanionManager, externalMemoryManager, nahidaPersonaManager, companionCoordinationManager, i18n, windowAuthManager, globalShortcut },
     build: async ({ dependsOn }) => setupSettingsWindowReusableFunc(dependsOn),
   })
 
   const mainWindow = injeca.provide('windows:main', {
-    dependsOn: { settingsWindow, chatWindow, widgetsManager, noticeWindow, beatSync, autoUpdater, serverChannel, godotStageManager, mcpStdioManager, externalIntegrationsManager, proactiveCompanionManager, externalMemoryManager, nahidaPersonaManager, i18n, onboardingWindowManager, windowAuthManager },
+    dependsOn: { settingsWindow, chatWindow, widgetsManager, noticeWindow, beatSync, autoUpdater, serverChannel, godotStageManager, mcpStdioManager, externalIntegrationsManager, proactiveCompanionManager, externalMemoryManager, nahidaPersonaManager, companionCoordinationManager, i18n, onboardingWindowManager, windowAuthManager },
     build: async ({ dependsOn }) => setupMainWindow({
       ...dependsOn,
       onWindowCreated: (window) => {

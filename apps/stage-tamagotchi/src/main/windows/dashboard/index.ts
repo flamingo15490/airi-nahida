@@ -3,6 +3,7 @@ import type { InferOutput } from 'valibot'
 
 import type { I18n } from '../../libs/i18n'
 import type { ServerChannel } from '../../services/airi/channel-server'
+import type { CompanionCoordinationManager } from '../../services/airi/companion-coordination'
 import type { NoticeWindowManager } from '../notice'
 import type { SettingsWindowManager } from '../settings'
 
@@ -48,6 +49,7 @@ export async function setupDashboardWindow(params: {
   onWindowCreated?: (window: BrowserWindow) => void
   serverChannel: ServerChannel
   i18n: I18n
+  companionCoordinationManager: CompanionCoordinationManager
 }) {
   const {
     setup: setupConfig,
@@ -139,6 +141,7 @@ export async function setupDashboardWindow(params: {
     noticeWindow: params.noticeWindow,
     i18n: params.i18n,
     serverChannel: params.serverChannel,
+    companionCoordinationManager: params.companionCoordinationManager,
   })
 
   await load(window, withHashRoute(baseUrl(resolve(getElectronMainDirname(), '..', 'renderer')), '/dashboard'))

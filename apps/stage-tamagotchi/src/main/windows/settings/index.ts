@@ -1,6 +1,7 @@
 import type { I18n } from '../../libs/i18n'
 import type { WindowAuthManager } from '../../services/airi/auth'
 import type { ServerChannel } from '../../services/airi/channel-server'
+import type { CompanionCoordinationManager } from '../../services/airi/companion-coordination'
 import type { ExternalIntegrationsManager } from '../../services/airi/external-integrations'
 import type { ExternalMemoryManager } from '../../services/airi/external-memory'
 import type { GodotStageManager } from '../../services/airi/godot-stage'
@@ -42,6 +43,7 @@ export function setupSettingsWindowReusableFunc(params: {
   proactiveCompanionManager: ProactiveCompanionManager
   externalMemoryManager: ExternalMemoryManager
   nahidaPersonaManager: NahidaPersonaManager
+  companionCoordinationManager: CompanionCoordinationManager
   i18n: I18n
   windowAuthManager: WindowAuthManager
   globalShortcut: GlobalShortcutService
@@ -86,6 +88,7 @@ export function setupSettingsWindowReusableFunc(params: {
       proactiveCompanionManager: params.proactiveCompanionManager,
       externalMemoryManager: params.externalMemoryManager,
       nahidaPersonaManager: params.nahidaPersonaManager,
+      companionCoordinationManager: params.companionCoordinationManager,
       i18n: params.i18n,
       windowAuthManager: params.windowAuthManager,
       globalShortcut: params.globalShortcut,

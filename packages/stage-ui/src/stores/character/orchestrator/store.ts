@@ -6,6 +6,7 @@ import { defineStore, storeToRefs } from 'pinia'
 import { ref } from 'vue'
 
 import { useCharacterNotebookStore, useCharacterStore } from '../'
+import { useCompanionCoordinationStore } from '../../companion-coordination-store'
 import { useLLM } from '../../llm'
 import { useModsServerChannelStore } from '../../mods/api/channel-server'
 import { useConsciousnessStore } from '../../modules/consciousness'
@@ -20,6 +21,7 @@ export const useCharacterOrchestratorStore = defineStore('character-orchestrator
   const providersStore = useProvidersStore()
   const characterStore = useCharacterStore()
   const notebookStore = useCharacterNotebookStore()
+  const coordinationStore = useCompanionCoordinationStore()
   const { systemPrompt } = storeToRefs(characterStore)
   const modsServerChannelStore = useModsServerChannelStore()
   const proactiveCompanionStore = useProactiveCompanionStore()
@@ -237,6 +239,9 @@ export const useCharacterOrchestratorStore = defineStore('character-orchestrator
       modsServerChannelStore.onEvent('spark:notify', async (event) => {
         try {
           const governance = await proactiveCompanionStore.evaluateSparkNotify(event)
+          await coordinationStore.refreshForSparkNotify().catch((error) => {
+            console.warn('Failed to refresh coordination snapshot after proactive governance:', error)
+          })
           if (governance.managed) {
             if (governance.decision?.decision !== 'delivered') {
               return

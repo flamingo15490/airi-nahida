@@ -1,7 +1,12 @@
 import type { createContext } from '@moeru/eventa/adapters/electron/main'
-import type { NahidaPersonaSettings } from '@proj-airi/stage-ui/stores/nahida-persona-shared'
+import type {
+  NahidaPersonaSettings,
+  NahidaPersonaSnapshot,
+  NahidaPersonaTargetContext,
+} from '@proj-airi/stage-ui/stores/nahida-persona-shared'
 
 import { defineInvokeHandler } from '@moeru/eventa'
+import { composeNahidaPersonaSnapshot } from '@proj-airi/stage-ui/stores/nahida-persona'
 
 import {
   electronNahidaPersonaGetConfig,
@@ -31,7 +36,10 @@ type MainContext = ReturnType<typeof createContext>['context']
  */
 export interface NahidaPersonaManager {
   getConfig: () => NahidaPersonaSettings
+  getSnapshot: () => NahidaPersonaSnapshot
+  getTargetContext: () => NahidaPersonaTargetContext
   saveConfig: (settings: NahidaPersonaSettings) => NahidaPersonaSettings
+  updateTargetContext: (context?: NahidaPersonaTargetContext) => NahidaPersonaTargetContext
 }
 
 export function createNahidaPersonaManager(): NahidaPersonaManager {
@@ -42,6 +50,7 @@ export function createNahidaPersonaManager(): NahidaPersonaManager {
   })
 
   configStore.setup()
+  let targetContext: NahidaPersonaTargetContext = {}
 
   function getConfigFile() {
     return parseNahidaPersonaConfigFile(configStore.get() ?? defaultConfig)
@@ -61,9 +70,34 @@ export function createNahidaPersonaManager(): NahidaPersonaManager {
     return next.settings
   }
 
+  function getTargetContext() {
+    return {
+      ...targetContext,
+    }
+  }
+
+  function updateTargetContext(context?: NahidaPersonaTargetContext) {
+    targetContext = {
+      activeCardName: context?.activeCardName?.trim(),
+      activeDisplayModelName: context?.activeDisplayModelName?.trim(),
+    }
+
+    return getTargetContext()
+  }
+
+  function getSnapshot() {
+    return composeNahidaPersonaSnapshot({
+      settings: getConfig(),
+      context: targetContext,
+    })
+  }
+
   return {
     getConfig,
+    getSnapshot,
+    getTargetContext,
     saveConfig,
+    updateTargetContext,
   }
 }
 

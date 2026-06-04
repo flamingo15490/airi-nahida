@@ -38,6 +38,7 @@ const ioTracerMocks = vi.hoisted(() => {
 })
 
 const llmStreamMock = vi.fn()
+const coordinationRefreshMock = vi.fn()
 const trackFirstMessageMock = vi.fn()
 const ingestContextMessageMock = vi.fn()
 const getContextsSnapshotMock = vi.fn()
@@ -126,6 +127,13 @@ vi.mock('./llm-toolset-prompts', () => ({
   }),
 }))
 
+vi.mock('./companion-coordination-store', () => ({
+  useCompanionCoordinationStore: () => ({
+    activeSupplement: '',
+    refresh: coordinationRefreshMock,
+  }),
+}))
+
 vi.mock('./modules/consciousness', () => ({
   useConsciousnessStore: () => ({
     activeProvider: ref('mock-provider'),
@@ -152,6 +160,8 @@ describe('chat orchestrator contract', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     llmStreamMock.mockReset()
+    coordinationRefreshMock.mockReset()
+    coordinationRefreshMock.mockResolvedValue(undefined)
     trackFirstMessageMock.mockReset()
     ingestContextMessageMock.mockReset()
     getContextsSnapshotMock.mockReset()
@@ -236,6 +246,7 @@ describe('chat orchestrator contract', () => {
       chatProvider: provider,
     })
 
+    expect(coordinationRefreshMock).toHaveBeenCalledTimes(1)
     expect(store.sending).toBe(false)
     expect(trackFirstMessageMock).toHaveBeenCalledTimes(1)
     // Datetime is no longer pushed through ingestContextMessage; it is now

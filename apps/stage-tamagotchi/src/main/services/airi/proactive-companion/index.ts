@@ -379,8 +379,8 @@ export interface ProactiveCompanionManager {
   loadConfig: () => ProactiveCompanionSettings
   saveConfig: (settings: ProactiveCompanionSettings) => ProactiveCompanionSettings
   getRuntimeSnapshot: () => ProactiveCompanionRuntimeSnapshot
-  refreshRuntime: () => ProactiveCompanionRuntimeSnapshot
-  clearHistory: () => ProactiveCompanionRuntimeSnapshot
+  refreshRuntime: () => Promise<ProactiveCompanionRuntimeSnapshot>
+  clearHistory: () => Promise<ProactiveCompanionRuntimeSnapshot>
   evaluateSparkNotify: (event: ProactiveCompanionSparkNotifyInput) => ProactiveCompanionEvaluateResult
   recordContextUpdate: (event: ProactiveCompanionContextUpdateInput) => ProactiveCompanionRuntimeSnapshot
 }
@@ -430,11 +430,11 @@ export function createProactiveCompanionManager(params: {
     })
   }
 
-  function refreshRuntime() {
+  async function refreshRuntime() {
     return getRuntimeSnapshot()
   }
 
-  function clearHistory() {
+  async function clearHistory() {
     recentDecisions = []
     lastDecision = undefined
     lastFailureReason = undefined
@@ -672,11 +672,11 @@ export function createProactiveCompanionService(params: {
   })
 
   defineInvokeHandler(params.context, electronProactiveCompanionRefreshRuntime, async () => {
-    return params.manager.refreshRuntime()
+    return await params.manager.refreshRuntime()
   })
 
   defineInvokeHandler(params.context, electronProactiveCompanionClearHistory, async () => {
-    return params.manager.clearHistory()
+    return await params.manager.clearHistory()
   })
 
   defineInvokeHandler(params.context, electronProactiveCompanionEvaluateSparkNotify, async (event) => {

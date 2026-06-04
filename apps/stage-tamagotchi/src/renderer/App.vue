@@ -8,6 +8,7 @@ import { useInferencePreload } from '@proj-airi/stage-ui/composables'
 import { useSharedAnalyticsStore } from '@proj-airi/stage-ui/stores/analytics'
 import { useCharacterOrchestratorStore } from '@proj-airi/stage-ui/stores/character'
 import { useChatSessionStore } from '@proj-airi/stage-ui/stores/chat/session-store'
+import { useCompanionCoordinationStore } from '@proj-airi/stage-ui/stores/companion-coordination-store'
 import { usePluginHostInspectorStore } from '@proj-airi/stage-ui/stores/devtools/plugin-host-debug'
 import { useDisplayModelsStore } from '@proj-airi/stage-ui/stores/display-models'
 import { useExternalMemoryStore } from '@proj-airi/stage-ui/stores/external-memory-store'
@@ -30,6 +31,10 @@ import { toast, Toaster } from 'vue-sonner'
 import ResizeHandler from './components/ResizeHandler.vue'
 
 import {
+  electronCompanionCoordinationClearHistory,
+  electronCompanionCoordinationGetSnapshot,
+  electronCompanionCoordinationRefresh,
+  electronCompanionCoordinationRefreshForSparkNotify,
   electronExternalMemoryGetLastUsage,
   electronExternalMemoryLoadContext,
   electronExternalMemoryRefreshContext,
@@ -91,6 +96,7 @@ const chatSessionStore = useChatSessionStore()
 const serverChannelStore = useModsServerChannelStore()
 const characterOrchestratorStore = useCharacterOrchestratorStore()
 const analyticsStore = useSharedAnalyticsStore()
+const coordinationStore = useCompanionCoordinationStore()
 const inferencePreload = useInferencePreload()
 const pluginHostInspectorStore = usePluginHostInspectorStore()
 const nahidaPersonaStore = useNahidaPersonaStore()
@@ -128,6 +134,10 @@ const writeExternalMemoryRecentSummary = useElectronEventaInvoke(electronExterna
 const writeExternalMemoryFollowUpItems = useElectronEventaInvoke(electronExternalMemoryWriteFollowUpItems)
 const writeExternalMemoryUserProfilePatch = useElectronEventaInvoke(electronExternalMemoryWriteUserProfilePatch)
 const writeExternalMemoryPreferencesPatch = useElectronEventaInvoke(electronExternalMemoryWritePreferencesPatch)
+const getCompanionCoordinationSnapshot = useElectronEventaInvoke(electronCompanionCoordinationGetSnapshot)
+const refreshCompanionCoordinationSnapshot = useElectronEventaInvoke(electronCompanionCoordinationRefresh)
+const clearCompanionCoordinationHistory = useElectronEventaInvoke(electronCompanionCoordinationClearHistory)
+const refreshCompanionCoordinationForSparkNotify = useElectronEventaInvoke(electronCompanionCoordinationRefreshForSparkNotify)
 const loadProactiveCompanionConfig = useElectronEventaInvoke(electronProactiveCompanionLoadConfig)
 const saveProactiveCompanionConfig = useElectronEventaInvoke(electronProactiveCompanionSaveConfig)
 const getProactiveCompanionRuntimeSnapshot = useElectronEventaInvoke(electronProactiveCompanionGetRuntimeSnapshot)
@@ -286,6 +296,13 @@ proactiveCompanionStore.setBridge({
   recordContextUpdate: event => recordProactiveCompanionContextUpdate(event),
 })
 
+coordinationStore.setBridge({
+  getSnapshot: request => getCompanionCoordinationSnapshot(request),
+  refresh: request => refreshCompanionCoordinationSnapshot(request),
+  clearHistory: request => clearCompanionCoordinationHistory(request),
+  refreshForSparkNotify: request => refreshCompanionCoordinationForSparkNotify(request),
+})
+
 // NOTICE: Runtime tool stores must register during setup so renderer consumers can see them
 // before `onMounted()` finishes the rest of the startup flow.
 void mcpToolsStore.refresh().catch((error) => {
@@ -314,6 +331,7 @@ onMounted(() => updateThemeColor())
 onMounted(() => {
   void proactiveCompanionStore.refreshConfig().catch(() => {})
   void proactiveCompanionStore.refreshRuntime().catch(() => {})
+  void coordinationStore.getSnapshot().catch(() => {})
 })
 
 context.value.on(electronSettingsNavigate, (event) => {
@@ -362,6 +380,9 @@ onMounted(async () => {
   await settingsAudioDeviceStore.initialize()
   await externalMemoryStore.refreshContext().catch((error) => {
     console.warn('[App] Failed to refresh external memory context:', error)
+  })
+  await coordinationStore.refresh().catch((error) => {
+    console.warn('[App] Failed to refresh coordination snapshot:', error)
   })
 
   if (isGodotStageRoute()) {

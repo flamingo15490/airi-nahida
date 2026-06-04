@@ -53,15 +53,17 @@ Implemented and already integrated into the source tree:
 - External memory read / supplement / controlled write-back flow
 - Nahida persona layer with clearer structured boundaries
 - Proactive companion governance layer with event history, cooldown control, and explainable decisions
+- Companion coordination layer that aligns memory, persona, and proactive state through one shared snapshot and overview surface
 
 ## Current Status
 
-The main body of the first five custom stages is now in place:
+The main body of the first six custom stages is now in place:
 - source stabilization
 - local integration stabilization
 - Nahida persona layer
 - external memory loop
 - proactive companion governance
+- coordination judgment and overview layer
 
 At this point, the repository is no longer just a loose patch stack. It already has a clearer custom baseline for future iteration.
 
@@ -100,4 +102,5 @@ For PR #1 acceptance, a dedicated acceptance worktree / launcher path is also us
 - Upstream AIRI remains the original foundation of this work.
 - This repository intentionally follows a conservative staged-integration path.
 - Large architectural rewrites are not the current priority.
-- The next natural step is to deepen the cooperation quality between memory, persona, and proactive companion behavior rather than expanding infrastructure blindly.
+- The current phase-six baseline already unifies memory, persona, and proactive state through a shared coordination layer.
+- The next natural step is to deepen cooperation quality and reduce day-to-day maintenance cost rather than expanding infrastructure blindly.

@@ -17,6 +17,7 @@ import { createMinecraftContext } from './chat/context-providers'
 import { useChatContextStore } from './chat/context-store'
 import { useChatSessionStore } from './chat/session-store'
 import { useChatStreamStore } from './chat/stream-store'
+import { useCompanionCoordinationStore } from './companion-coordination-store'
 import { useContextObservabilityStore } from './devtools/context-observability'
 import { useExternalMemoryStore } from './external-memory-store'
 import { useLLM } from './llm'
@@ -50,6 +51,7 @@ export const useChatOrchestratorStore = defineStore('chat-orchestrator', () => {
   const llmStore = useLLM()
   const llmToolsetPromptsStore = useLlmToolsetPromptsStore()
   const externalMemoryStore = useExternalMemoryStore()
+  const coordinationStore = useCompanionCoordinationStore()
   const nahidaPersonaStore = useNahidaPersonaStore()
   const consciousnessStore = useConsciousnessStore()
   const artistryAutonomousStore = useAutonomousArtistryStore()
@@ -165,6 +167,7 @@ export const useChatOrchestratorStore = defineStore('chat-orchestrator', () => {
       llmToolsetPromptsStore.activeToolsetPrompt,
       externalMemoryStore.activeSupplement,
       nahidaPersonaStore.activeSupplement,
+      coordinationStore.activeSupplement,
     ),
     runtimeContextProviders: [
       createMinecraftContext,
@@ -248,6 +251,9 @@ export const useChatOrchestratorStore = defineStore('chat-orchestrator', () => {
   ) {
     await externalMemoryStore.refreshContext().catch((error) => {
       console.warn('[external-memory] Failed to refresh prompt context:', error)
+    })
+    await coordinationStore.refresh().catch((error) => {
+      console.warn('[companion-coordination] Failed to refresh coordination snapshot before send:', error)
     })
 
     return runtime.ingest(sendingMessage, options, targetSessionId)

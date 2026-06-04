@@ -23,6 +23,11 @@ import type {
 } from '@proj-airi/stage-ui-three/trace'
 
 import type {
+  CompanionCoordinationRefreshRequest,
+  CompanionCoordinationSnapshot,
+  CompanionCoordinationSparkNotifyResult,
+} from '../companion-coordination'
+import type {
   ExternalIntegrationConfig,
   ExternalIntegrationImportResult,
   ExternalIntegrationKind,
@@ -85,6 +90,10 @@ export const electronProactiveCompanionEvaluateSparkNotify = defineInvokeEventa<
 export const electronProactiveCompanionRecordContextUpdate = defineInvokeEventa<ProactiveCompanionRuntimeSnapshot, ProactiveCompanionContextUpdateInput>('eventa:invoke:electron:proactive-companion:record-context-update')
 export const electronNahidaPersonaGetConfig = defineInvokeEventa<NahidaPersonaSettings>('eventa:invoke:electron:nahida-persona:get-config')
 export const electronNahidaPersonaSaveConfig = defineInvokeEventa<NahidaPersonaSettings, NahidaPersonaSettings>('eventa:invoke:electron:nahida-persona:save-config')
+export const electronCompanionCoordinationGetSnapshot = defineInvokeEventa<CompanionCoordinationSnapshot, CompanionCoordinationRefreshRequest | undefined>('eventa:invoke:electron:companion-coordination:get-snapshot')
+export const electronCompanionCoordinationRefresh = defineInvokeEventa<CompanionCoordinationSnapshot, CompanionCoordinationRefreshRequest | undefined>('eventa:invoke:electron:companion-coordination:refresh')
+export const electronCompanionCoordinationClearHistory = defineInvokeEventa<CompanionCoordinationSnapshot, CompanionCoordinationRefreshRequest | undefined>('eventa:invoke:electron:companion-coordination:clear-history')
+export const electronCompanionCoordinationRefreshForSparkNotify = defineInvokeEventa<CompanionCoordinationSparkNotifyResult, CompanionCoordinationRefreshRequest | undefined>('eventa:invoke:electron:companion-coordination:refresh-for-spark-notify')
 
 export type ElectronUpdaterChannel = 'latest' | 'stable' | 'alpha' | 'beta' | 'nightly' | 'canary'
 

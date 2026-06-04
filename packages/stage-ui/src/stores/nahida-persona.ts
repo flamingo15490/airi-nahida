@@ -3,6 +3,8 @@ import type {
   NahidaPersonaAsset,
   NahidaPersonaSectionPreview,
   NahidaPersonaSettings,
+  NahidaPersonaSnapshot,
+  NahidaPersonaTargetContext,
 } from './nahida-persona-shared'
 
 import {
@@ -185,6 +187,61 @@ export function isNahidaPersonaTarget(params: {
 }) {
   return isNahidaActiveCardName(params.cardName)
     || isNahidaActiveCardName(params.displayModelName)
+}
+
+/**
+ * Composes one read-only Nahida persona runtime snapshot from persisted
+ * settings plus the latest known targeting context.
+ *
+ * Use when:
+ * - Renderer and main process must share the same target-match evaluation
+ * - Coordination code should consume a stable persona snapshot contract
+ *
+ * Expects:
+ * - `settings` may be partial and will be normalized against shared defaults
+ * - `context` may be missing when the runtime has not observed the active AIRI target yet
+ *
+ * Returns:
+ * - One deterministic snapshot describing whether the Nahida layer is active
+ */
+export function composeNahidaPersonaSnapshot(params: {
+  settings?: Partial<NahidaPersonaSettings> | undefined
+  context?: NahidaPersonaTargetContext | undefined
+}): NahidaPersonaSnapshot {
+  const settings = {
+    ...createDefaultNahidaPersonaSettings(),
+    ...params.settings,
+  } satisfies NahidaPersonaSettings
+  const activeCardName = params.context?.activeCardName?.trim()
+  const activeDisplayModelName = params.context?.activeDisplayModelName?.trim()
+  const matchesActiveCard = isNahidaPersonaTarget({
+    cardName: activeCardName,
+    displayModelName: activeDisplayModelName,
+  })
+  const activeModeBehavior = getNahidaPersonaModeBehavior(settings.mode)
+  const isActive = settings.enabled && matchesActiveCard
+  const summary = (() => {
+    if (!settings.enabled) {
+      return 'Nahida persona layer is disabled. The active card remains unchanged.'
+    }
+
+    if (!matchesActiveCard) {
+      return 'Current active card and display model are not recognized as Nahida, so the supplement stays inactive.'
+    }
+
+    return `Nahida persona layer is active in ${settings.mode} mode. ${activeModeBehavior.summary}`
+  })()
+
+  return {
+    ...settings,
+    activeCardName,
+    activeDisplayModelName,
+    matchesActiveCard,
+    isActive,
+    summary,
+    activeModeSummary: activeModeBehavior.summary,
+    sections: getNahidaPersonaSectionPreviews(settings.mode),
+  }
 }
 
 export function joinPromptSections(...sections: Array<string | undefined>) {

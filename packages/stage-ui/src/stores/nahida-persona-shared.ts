@@ -30,10 +30,18 @@ export interface NahidaPersonaSectionPreview {
 }
 
 /**
+ * Minimal runtime context needed to decide whether Nahida persona currently
+ * targets the active AIRI session.
+ */
+export interface NahidaPersonaTargetContext {
+  activeCardName?: string
+  activeDisplayModelName?: string
+}
+
+/**
  * Runtime snapshot exposed to desktop settings and prompt composition.
  */
-export interface NahidaPersonaSnapshot extends NahidaPersonaSettings {
-  activeCardName?: string
+export interface NahidaPersonaSnapshot extends NahidaPersonaSettings, NahidaPersonaTargetContext {
   matchesActiveCard: boolean
   isActive: boolean
   summary: string

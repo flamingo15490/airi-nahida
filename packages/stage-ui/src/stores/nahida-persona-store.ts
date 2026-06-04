@@ -6,6 +6,7 @@ import { computed, ref, toRaw } from 'vue'
 
 import { useAiriCardStore } from './modules/airi-card'
 import {
+  composeNahidaPersonaSnapshot,
   composeNahidaPersonaSupplement,
   getNahidaPersonaModeBehavior,
   getNahidaPersonaSectionPreviews,
@@ -58,14 +59,12 @@ export const useNahidaPersonaStore = defineStore('nahida-persona', () => {
 
     return `Nahida persona layer is active in ${settings.value.mode} mode. ${activeModeSummary.value}`
   })
-  const snapshot = computed<NahidaPersonaSnapshot>(() => ({
-    ...settings.value,
-    activeCardName: activeCardName.value,
-    matchesActiveCard: matchesActiveCard.value,
-    isActive: isActive.value,
-    activeModeSummary: activeModeSummary.value,
-    sections: sections.value,
-    summary: summary.value,
+  const snapshot = computed<NahidaPersonaSnapshot>(() => composeNahidaPersonaSnapshot({
+    settings: settings.value,
+    context: {
+      activeCardName: activeCardName.value,
+      activeDisplayModelName: activeDisplayModelName.value,
+    },
   }))
 
   function setBridge(nextBridge: NahidaPersonaBridge) {
@@ -124,6 +123,7 @@ export const useNahidaPersonaStore = defineStore('nahida-persona', () => {
 
   return {
     activeCardName,
+    activeDisplayModelName,
     activeModeSummary,
     activeSupplement,
     error,
