@@ -1,9 +1,12 @@
 import type { ChatHistoryItem } from '../types/chat'
 import type {
   ExternalMemoryContextSnapshot,
+  ExternalMemoryTurnSnapshot,
   ExternalMemoryUsageSnapshot,
+  ExternalMemoryWriteCandidate,
   ExternalMemoryWriteRequest,
   ExternalMemoryWriteResult,
+  ExternalMemoryWriteReviewSnapshot,
 } from './external-memory-shared'
 
 import { errorMessageFrom } from '@moeru/std'
@@ -13,7 +16,11 @@ import { computed, ref } from 'vue'
 import { extractMessageText } from '../libs/chat-sync'
 import { useChatSessionStore } from './chat/session-store'
 import { composeExternalMemorySupplement } from './external-memory'
-import { createDefaultExternalMemoryUsageSnapshot } from './external-memory-shared'
+import {
+  createDefaultExternalMemoryTurnSnapshot,
+  createDefaultExternalMemoryUsageSnapshot,
+  createDefaultExternalMemoryWriteReviewSnapshot,
+} from './external-memory-shared'
 import { useAiriCardStore } from './modules/airi-card'
 import { useSettingsStageModel } from './settings/stage-model'
 
@@ -29,11 +36,20 @@ export interface ExternalMemoryBridge {
   loadMemoryContext: (request?: ExternalMemoryLoadRequest) => Promise<ExternalMemoryContextSnapshot>
   refreshMemoryContext: (request?: ExternalMemoryLoadRequest) => Promise<ExternalMemoryContextSnapshot>
   getLastMemoryUsage: () => Promise<ExternalMemoryUsageSnapshot>
+  clearMemoryWriteCandidateHistory: () => Promise<ExternalMemoryUsageSnapshot>
   writeRecentSummary: (request: ExternalMemoryWriteRequest) => Promise<ExternalMemoryWriteResult>
   writeFollowUpItems: (request: ExternalMemoryWriteRequest) => Promise<ExternalMemoryWriteResult>
   writeUserProfilePatch: (request: ExternalMemoryWriteRequest) => Promise<ExternalMemoryWriteResult>
   writePreferencesPatch: (request: ExternalMemoryWriteRequest) => Promise<ExternalMemoryWriteResult>
 }
+
+const EMPTY_EXTERNAL_MEMORY_SECTIONS = {
+  userProfile: [],
+  preferences: [],
+  followUps: [],
+  recentSummary: [],
+  characterKnowledge: [],
+} satisfies ExternalMemoryContextSnapshot['sections']
 
 /**
  * Normalizes freeform text into one-line memory-safe facts or todo items.
@@ -91,6 +107,84 @@ function filterActionableFollowUps(candidates: string[]) {
     return isActionableFollowUpCandidate(candidate)
       && !isFollowUpMetaDiscussion(candidate)
   })
+}
+
+function cloneWriteCandidate(candidate: ExternalMemoryWriteCandidate): ExternalMemoryWriteCandidate {
+  return {
+    ...candidate,
+    addItems: [...candidate.addItems],
+    removeItems: [...candidate.removeItems],
+  }
+}
+
+function normalizeTurnSnapshot(
+  snapshot?: ExternalMemoryTurnSnapshot,
+  fallback?: Pick<ExternalMemoryContextSnapshot, 'readAt' | 'characterName' | 'layerOrder' | 'usedLayers' | 'summary'>,
+): ExternalMemoryTurnSnapshot {
+  const defaultSnapshot = createDefaultExternalMemoryTurnSnapshot()
+  const normalizedSnapshot = snapshot
+
+  return {
+    ...defaultSnapshot,
+    ...normalizedSnapshot,
+    readAt: normalizedSnapshot?.readAt || fallback?.readAt || defaultSnapshot.readAt,
+    characterName: normalizedSnapshot?.characterName ?? fallback?.characterName,
+    layerOrder: normalizedSnapshot?.layerOrder?.length ? [...normalizedSnapshot.layerOrder] : [...(fallback?.layerOrder ?? defaultSnapshot.layerOrder)],
+    usedLayers: normalizedSnapshot?.usedLayers?.length ? [...normalizedSnapshot.usedLayers] : [...(fallback?.usedLayers ?? defaultSnapshot.usedLayers)],
+    summary: normalizedSnapshot?.summary || fallback?.summary || defaultSnapshot.summary,
+    selections: [...(normalizedSnapshot?.selections ?? defaultSnapshot.selections)],
+    evidence: [...(normalizedSnapshot?.evidence ?? defaultSnapshot.evidence)],
+    citations: [...(normalizedSnapshot?.citations ?? defaultSnapshot.citations)],
+  }
+}
+
+function normalizeWriteReviewSnapshot(snapshot?: ExternalMemoryWriteReviewSnapshot): ExternalMemoryWriteReviewSnapshot {
+  const defaultSnapshot = createDefaultExternalMemoryWriteReviewSnapshot()
+  const normalizedSnapshot = snapshot ?? defaultSnapshot
+
+  return {
+    ...defaultSnapshot,
+    ...normalizedSnapshot,
+    candidates: (normalizedSnapshot.candidates ?? defaultSnapshot.candidates).map(cloneWriteCandidate),
+  }
+}
+
+function normalizeContextSnapshot(snapshot: ExternalMemoryContextSnapshot): ExternalMemoryContextSnapshot {
+  return {
+    ...snapshot,
+    layerOrder: snapshot.layerOrder?.length ? [...snapshot.layerOrder] : [...createDefaultExternalMemoryTurnSnapshot().layerOrder],
+    documents: [...(snapshot.documents ?? [])],
+    usedKinds: [...(snapshot.usedKinds ?? [])],
+    usedLayers: [...(snapshot.usedLayers ?? [])],
+    turn: normalizeTurnSnapshot(snapshot.turn, snapshot),
+    sections: {
+      ...EMPTY_EXTERNAL_MEMORY_SECTIONS,
+      ...snapshot.sections,
+      userProfile: [...(snapshot.sections?.userProfile ?? EMPTY_EXTERNAL_MEMORY_SECTIONS.userProfile)],
+      preferences: [...(snapshot.sections?.preferences ?? EMPTY_EXTERNAL_MEMORY_SECTIONS.preferences)],
+      followUps: [...(snapshot.sections?.followUps ?? EMPTY_EXTERNAL_MEMORY_SECTIONS.followUps)],
+      recentSummary: [...(snapshot.sections?.recentSummary ?? EMPTY_EXTERNAL_MEMORY_SECTIONS.recentSummary)],
+      characterKnowledge: [...(snapshot.sections?.characterKnowledge ?? EMPTY_EXTERNAL_MEMORY_SECTIONS.characterKnowledge)],
+    },
+  }
+}
+
+function normalizeUsageSnapshot(
+  snapshot: ExternalMemoryUsageSnapshot,
+  contextSnapshot?: ExternalMemoryContextSnapshot,
+): ExternalMemoryUsageSnapshot {
+  const normalizedContext = contextSnapshot ?? snapshot.context
+  const defaultUsage = createDefaultExternalMemoryUsageSnapshot()
+
+  return {
+    ...defaultUsage,
+    ...snapshot,
+    context: normalizedContext ? normalizeContextSnapshot(normalizedContext) : undefined,
+    turn: normalizeTurnSnapshot(snapshot.turn, normalizedContext),
+    lastWriteReview: normalizeWriteReviewSnapshot(snapshot.lastWriteReview ?? snapshot.lastWrite?.review),
+    recentWrites: [...(snapshot.recentWrites ?? defaultUsage.recentWrites)],
+    lastUsedDocumentKinds: [...(snapshot.lastUsedDocumentKinds ?? defaultUsage.lastUsedDocumentKinds)],
+  }
 }
 
 /**
@@ -204,6 +298,7 @@ export const useExternalMemoryStore = defineStore('external-memory', () => {
   const bridge = ref<ExternalMemoryBridge>()
   const context = ref<ExternalMemoryContextSnapshot>()
   const usage = ref<ExternalMemoryUsageSnapshot>(createDefaultExternalMemoryUsageSnapshot())
+  const candidateHistory = ref<ExternalMemoryWriteCandidate[]>([])
   const loading = ref(false)
   const refreshing = ref(false)
   const writing = ref(false)
@@ -217,6 +312,27 @@ export const useExternalMemoryStore = defineStore('external-memory', () => {
     context: context.value,
   }))
   const isAvailable = computed(() => usage.value.bridgeState === 'ready' || usage.value.bridgeState === 'degraded')
+  const turnSnapshot = computed(() => normalizeTurnSnapshot(usage.value.turn, context.value))
+  const writeReviewSnapshot = computed(() => normalizeWriteReviewSnapshot(usage.value.lastWriteReview ?? usage.value.lastWrite?.review))
+  const latestPersistedWrite = computed(() => {
+    if (usage.value.lastWrite?.decision === 'written')
+      return usage.value.lastWrite
+
+    return usage.value.recentWrites.find(result => result.decision === 'written')
+  })
+
+  function syncCandidateHistory(reviewSnapshot?: ExternalMemoryWriteReviewSnapshot) {
+    candidateHistory.value = normalizeWriteReviewSnapshot(reviewSnapshot).candidates
+  }
+
+  function setContextSnapshot(nextContext: ExternalMemoryContextSnapshot) {
+    context.value = normalizeContextSnapshot(nextContext)
+  }
+
+  function setUsageSnapshot(nextUsage: ExternalMemoryUsageSnapshot) {
+    usage.value = normalizeUsageSnapshot(nextUsage, context.value)
+    syncCandidateHistory(usage.value.lastWriteReview)
+  }
 
   function setBridge(nextBridge: ExternalMemoryBridge) {
     bridge.value = nextBridge
@@ -237,7 +353,7 @@ export const useExternalMemoryStore = defineStore('external-memory', () => {
   }
 
   async function refreshUsage() {
-    usage.value = await withBridge(activeBridge => activeBridge.getLastMemoryUsage())
+    setUsageSnapshot(await withBridge(activeBridge => activeBridge.getLastMemoryUsage()))
     return usage.value
   }
 
@@ -246,7 +362,7 @@ export const useExternalMemoryStore = defineStore('external-memory', () => {
     error.value = undefined
 
     try {
-      context.value = await withBridge(activeBridge => activeBridge.loadMemoryContext(buildLoadRequest()))
+      setContextSnapshot(await withBridge(activeBridge => activeBridge.loadMemoryContext(buildLoadRequest())))
       await refreshUsage()
       return context.value
     }
@@ -264,7 +380,7 @@ export const useExternalMemoryStore = defineStore('external-memory', () => {
     error.value = undefined
 
     try {
-      context.value = await withBridge(activeBridge => activeBridge.refreshMemoryContext(buildLoadRequest()))
+      setContextSnapshot(await withBridge(activeBridge => activeBridge.refreshMemoryContext(buildLoadRequest())))
       await refreshUsage()
       return context.value
     }
@@ -327,6 +443,27 @@ export const useExternalMemoryStore = defineStore('external-memory', () => {
     })
   }
 
+  async function refreshTurnSnapshot() {
+    return await refreshContext()
+  }
+
+  async function refreshWriteReview() {
+    await refreshUsage()
+    return writeReviewSnapshot.value
+  }
+
+  async function clearCandidateHistory() {
+    error.value = undefined
+
+    try {
+      setUsageSnapshot(await withBridge(activeBridge => activeBridge.clearMemoryWriteCandidateHistory()))
+    }
+    catch (cause) {
+      error.value = errorMessageFrom(cause) ?? 'Failed to clear external memory candidate history.'
+      throw cause
+    }
+  }
+
   async function captureUserTurn(params: {
     messageText: string
   }) {
@@ -379,19 +516,26 @@ export const useExternalMemoryStore = defineStore('external-memory', () => {
     activeCharacterName,
     activeDisplayModelName,
     activeSupplement,
+    candidateHistory,
     context,
     error,
     isAvailable,
+    latestPersistedWrite,
     loading,
     refreshing,
+    turnSnapshot,
     usage,
+    writeReviewSnapshot,
     writing,
 
+    clearCandidateHistory,
     captureAssistantTurn,
     captureUserTurn,
     loadContext,
     refreshContext,
+    refreshTurnSnapshot,
     refreshUsage,
+    refreshWriteReview,
     setBridge,
     writeFollowUpItems,
     writePreferencesPatch,

@@ -1,4 +1,8 @@
-import type { ExternalMemoryUsageSnapshot } from './external-memory-shared'
+import type {
+  ExternalMemoryContextSnapshot,
+  ExternalMemoryUsageSnapshot,
+  ExternalMemoryWriteResult,
+} from './external-memory-shared'
 import type { NahidaPersonaSnapshot } from './nahida-persona-shared'
 import type { ProactiveCompanionRuntimeSnapshot } from './proactive-companion-shared'
 
@@ -8,7 +12,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { composeCompanionCoordinationSnapshot } from './companion-coordination-shared'
 import { useCompanionCoordinationStore } from './companion-coordination-store'
-import { createDefaultExternalMemoryUsageSnapshot } from './external-memory-shared'
+import {
+  createDefaultExternalMemoryTurnSnapshot,
+  createDefaultExternalMemoryUsageSnapshot,
+  createExternalMemoryReasonSnapshot,
+  EXTERNAL_MEMORY_LAYER_KINDS,
+} from './external-memory-shared'
 import { createDefaultNahidaPersonaSettings } from './nahida-persona-shared'
 import { createDefaultProactiveCompanionRuntimeSnapshot } from './proactive-companion-shared'
 
@@ -17,15 +26,15 @@ vi.mock('./external-memory-store', () => ({
     usage: {
       ...createDefaultExternalMemoryUsageSnapshot(),
       bridgeState: 'ready',
+      reason: createExternalMemoryReasonSnapshot('bridge-ready'),
       summary: 'External memory bridge is healthy.',
       lastReadAt: 1,
       lastUsedDocumentKinds: ['user-profile'],
-      context: {
-        state: 'ready',
+      context: createMemoryContextSnapshot({
         summary: 'Loaded.',
         readAt: 1,
         usedKinds: ['user-profile'],
-        documents: [],
+        usedLayers: ['stable-profile'],
         sections: {
           userProfile: ['Prefers concise replies.'],
           preferences: [],
@@ -33,7 +42,7 @@ vi.mock('./external-memory-store', () => ({
           recentSummary: [],
           characterKnowledge: [],
         },
-      },
+      }),
     },
   }),
 }))
@@ -128,9 +137,82 @@ function createDisabledMemorySnapshot(overrides: Partial<ExternalMemoryUsageSnap
   return {
     ...createDefaultExternalMemoryUsageSnapshot(),
     bridgeState: 'disabled',
+    reason: createExternalMemoryReasonSnapshot('bridge-disabled'),
     summary: 'External memory bridge is disabled.',
     lastUsedDocumentKinds: [],
     ...overrides,
+  }
+}
+
+function createMemoryContextSnapshot(params: {
+  summary: string
+  readAt: number
+  usedKinds: Array<'user-profile' | 'preferences'>
+  usedLayers: Array<'stable-profile' | 'stable-preferences'>
+  sections: {
+    userProfile: string[]
+    preferences: string[]
+    followUps: string[]
+    recentSummary: string[]
+    characterKnowledge: string[]
+  }
+}): ExternalMemoryContextSnapshot {
+  return {
+    state: 'ready' as const,
+    reason: createExternalMemoryReasonSnapshot(params.usedKinds.length > 0 ? 'context-loaded' : 'context-empty'),
+    summary: params.summary,
+    readAt: params.readAt,
+    layerOrder: [...EXTERNAL_MEMORY_LAYER_KINDS],
+    usedKinds: [...params.usedKinds],
+    usedLayers: [...params.usedLayers],
+    documents: [],
+    turn: {
+      ...createDefaultExternalMemoryTurnSnapshot(),
+      readAt: params.readAt,
+      usedLayers: [...params.usedLayers],
+      summary: params.summary,
+    },
+    sections: params.sections,
+  }
+}
+
+function createWriteResult(params: {
+  kind: 'follow-ups' | 'preferences' | 'recent-summary'
+  decision: 'written' | 'skipped-duplicate' | 'skipped-unavailable'
+  summary: string
+  writtenAt: number
+  ok: boolean
+  changed: boolean
+  error?: string
+}): ExternalMemoryWriteResult {
+  const layer: ExternalMemoryWriteResult['layer'] = params.kind === 'follow-ups'
+    ? 'active-follow-ups'
+    : params.kind === 'preferences'
+      ? 'stable-preferences'
+      : 'recent-context'
+  const reasonCode = params.decision === 'written'
+    ? 'write-written'
+    : params.decision === 'skipped-duplicate'
+      ? 'write-skipped-duplicate'
+      : 'write-skipped-unavailable'
+
+  return {
+    kind: params.kind,
+    layer,
+    ok: params.ok,
+    changed: params.changed,
+    decision: params.decision,
+    reason: createExternalMemoryReasonSnapshot(reasonCode),
+    summary: params.summary,
+    writtenAt: params.writtenAt,
+    error: params.error,
+    review: {
+      reviewedAt: params.writtenAt,
+      summary: `Reviewed ${params.kind}.`,
+      decision: params.decision,
+      reason: createExternalMemoryReasonSnapshot(reasonCode),
+      candidates: [],
+    },
   }
 }
 
@@ -144,15 +226,15 @@ describe('companion coordination snapshot', () => {
       memoryUsage: {
         ...createDefaultExternalMemoryUsageSnapshot(),
         bridgeState: 'ready',
+        reason: createExternalMemoryReasonSnapshot('bridge-ready'),
         summary: 'External memory bridge is healthy.',
         lastReadAt: 10,
         lastUsedDocumentKinds: ['user-profile', 'preferences'],
-        context: {
-          state: 'ready',
+        context: createMemoryContextSnapshot({
           summary: 'Loaded.',
           readAt: 10,
           usedKinds: ['user-profile', 'preferences'],
-          documents: [],
+          usedLayers: ['stable-profile', 'stable-preferences'],
           sections: {
             userProfile: ['Studies finance.'],
             preferences: ['Prefers concise replies.'],
@@ -160,7 +242,7 @@ describe('companion coordination snapshot', () => {
             recentSummary: [],
             characterKnowledge: [],
           },
-        },
+        }),
       },
       persona: createReadyPersonaSnapshot(),
       proactiveRuntime: createReadyProactiveRuntimeSnapshot(),
@@ -185,6 +267,7 @@ describe('companion coordination snapshot', () => {
       memoryUsage: {
         ...createDefaultExternalMemoryUsageSnapshot(),
         bridgeState: 'degraded',
+        reason: createExternalMemoryReasonSnapshot('bridge-degraded'),
         summary: 'Last memory read failed.',
         lastReadAt: 12,
         lastReadError: 'Filesystem bridge timeout.',
@@ -276,16 +359,16 @@ describe('companion coordination snapshot', () => {
       memoryUsage: {
         ...createDefaultExternalMemoryUsageSnapshot(),
         bridgeState: 'ready',
+        reason: createExternalMemoryReasonSnapshot('bridge-ready'),
         summary: 'External memory bridge is healthy but the latest context is empty.',
         lastReadAt: 40,
         lastReadSummary: 'Memory context loaded without trusted items.',
         lastUsedDocumentKinds: [],
-        context: {
-          state: 'ready',
+        context: createMemoryContextSnapshot({
           summary: 'Loaded without stable sections.',
           readAt: 35,
           usedKinds: [],
-          documents: [],
+          usedLayers: [],
           sections: {
             userProfile: [],
             preferences: [],
@@ -293,7 +376,7 @@ describe('companion coordination snapshot', () => {
             recentSummary: [],
             characterKnowledge: [],
           },
-        },
+        }),
       },
       persona: createDisabledPersonaSnapshot(),
       proactiveRuntime: createDisabledProactiveRuntimeSnapshot(),
@@ -312,24 +395,25 @@ describe('companion coordination snapshot', () => {
       memoryUsage: {
         ...createDefaultExternalMemoryUsageSnapshot(),
         bridgeState: 'disabled',
+        reason: createExternalMemoryReasonSnapshot('bridge-disabled'),
         summary: 'External memory bridge is disabled.',
         lastReadSummary: 'Automatic reads are disabled.',
-        lastWrite: {
+        lastWrite: createWriteResult({
           kind: 'follow-ups',
           ok: true,
           changed: false,
           decision: 'skipped-duplicate',
           summary: 'Follow-up items already matched the latest stable notes.',
           writtenAt: 55,
-        },
-        recentWrites: [{
+        }),
+        recentWrites: [createWriteResult({
           kind: 'preferences',
           ok: true,
           changed: true,
           decision: 'written',
           summary: 'Updated preferences.',
           writtenAt: 50,
-        }],
+        })],
         lastUsedDocumentKinds: [],
       },
       persona: createDisabledPersonaSnapshot(),
@@ -348,10 +432,11 @@ describe('companion coordination snapshot', () => {
       memoryUsage: {
         ...createDefaultExternalMemoryUsageSnapshot(),
         bridgeState: 'degraded',
+        reason: createExternalMemoryReasonSnapshot('bridge-degraded'),
         summary: 'Last memory write failed.',
         lastReadAt: 60,
         lastReadSummary: 'Latest read used stale memory cache.',
-        lastWrite: {
+        lastWrite: createWriteResult({
           kind: 'recent-summary',
           ok: false,
           changed: false,
@@ -359,7 +444,7 @@ describe('companion coordination snapshot', () => {
           summary: 'Recent summary write failed because the bridge timed out.',
           writtenAt: 62,
           error: 'Filesystem bridge timeout.',
-        },
+        }),
         lastUsedDocumentKinds: [],
       },
       persona: createDisabledPersonaSnapshot(),
@@ -378,6 +463,7 @@ describe('companion coordination snapshot', () => {
     const snapshot = composeCompanionCoordinationSnapshot({
       memoryUsage: {
         ...createDefaultExternalMemoryUsageSnapshot(),
+        reason: createExternalMemoryReasonSnapshot('bridge-unavailable'),
         summary: 'External memory bridge is not available in this runtime.',
       },
       persona: createDisabledPersonaSnapshot(),
@@ -482,15 +568,15 @@ describe('companion coordination snapshot', () => {
       memoryUsage: {
         ...createDefaultExternalMemoryUsageSnapshot(),
         bridgeState: 'ready',
+        reason: createExternalMemoryReasonSnapshot('bridge-ready'),
         summary: 'External memory bridge is healthy.',
         lastReadAt: 9,
         lastUsedDocumentKinds: ['user-profile'],
-        context: {
-          state: 'ready',
+        context: createMemoryContextSnapshot({
           summary: 'Loaded.',
           readAt: 9,
           usedKinds: ['user-profile'],
-          documents: [],
+          usedLayers: ['stable-profile'],
           sections: {
             userProfile: ['Prefers concise replies.'],
             preferences: [],
@@ -498,7 +584,7 @@ describe('companion coordination snapshot', () => {
             recentSummary: [],
             characterKnowledge: [],
           },
-        },
+        }),
       },
       persona: createReadyPersonaSnapshot(),
       proactiveRuntime: createReadyProactiveRuntimeSnapshot(),

@@ -81,6 +81,7 @@ export const electronExternalIntegrationsImportLegacyMcp = defineInvokeEventa<Ex
 export const electronExternalMemoryLoadContext = defineInvokeEventa<ExternalMemoryContextSnapshot, ExternalMemoryLoadRequest | undefined>('eventa:invoke:electron:external-memory:load-context')
 export const electronExternalMemoryRefreshContext = defineInvokeEventa<ExternalMemoryContextSnapshot, ExternalMemoryLoadRequest | undefined>('eventa:invoke:electron:external-memory:refresh-context')
 export const electronExternalMemoryGetLastUsage = defineInvokeEventa<ExternalMemoryUsageSnapshot>('eventa:invoke:electron:external-memory:get-last-usage')
+export const electronExternalMemoryClearWriteCandidateHistory = defineInvokeEventa<ExternalMemoryUsageSnapshot>('eventa:invoke:electron:external-memory:clear-write-candidate-history')
 export const electronExternalMemoryWriteRecentSummary = defineInvokeEventa<ExternalMemoryWriteResult, ExternalMemoryWriteRequest>('eventa:invoke:electron:external-memory:write-recent-summary')
 export const electronExternalMemoryWriteFollowUpItems = defineInvokeEventa<ExternalMemoryWriteResult, ExternalMemoryWriteRequest>('eventa:invoke:electron:external-memory:write-follow-up-items')
 export const electronExternalMemoryWriteUserProfilePatch = defineInvokeEventa<ExternalMemoryWriteResult, ExternalMemoryWriteRequest>('eventa:invoke:electron:external-memory:write-user-profile-patch')

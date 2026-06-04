@@ -5,13 +5,54 @@ import type { GodotStageManager } from '../godot-stage'
 import type { NahidaPersonaManager } from '../nahida-persona'
 import type { ProactiveCompanionManager } from '../proactive-companion'
 
-import { createDefaultExternalMemoryUsageSnapshot } from '@proj-airi/stage-ui/stores/external-memory-shared'
+import {
+  createDefaultExternalMemoryTurnSnapshot,
+  createDefaultExternalMemoryUsageSnapshot,
+  createExternalMemoryReasonSnapshot,
+  EXTERNAL_MEMORY_LAYER_KINDS,
+} from '@proj-airi/stage-ui/stores/external-memory-shared'
 import { createDefaultNahidaPersonaSettings } from '@proj-airi/stage-ui/stores/nahida-persona-shared'
 import { createDefaultProactiveCompanionRuntimeSnapshot } from '@proj-airi/stage-ui/stores/proactive-companion-shared'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { deriveOverallHealth } from '../../../../shared/system-health'
 import { createSystemHealthManager } from './index'
+
+function createMemoryContextSnapshot(params: {
+  state?: 'ready' | 'degraded'
+  summary: string
+  readAt: number
+  usedKinds: Array<'user-profile'>
+  usedLayers: Array<'stable-profile'>
+  sections: {
+    userProfile: string[]
+    preferences: string[]
+    followUps: string[]
+    recentSummary: string[]
+    characterKnowledge: string[]
+  }
+}) {
+  const usedKinds = [...params.usedKinds]
+  const usedLayers = [...params.usedLayers]
+
+  return {
+    state: params.state ?? 'ready' as const,
+    reason: createExternalMemoryReasonSnapshot(usedKinds.length > 0 ? 'context-loaded' : 'context-empty'),
+    summary: params.summary,
+    readAt: params.readAt,
+    layerOrder: [...EXTERNAL_MEMORY_LAYER_KINDS],
+    documents: [],
+    usedKinds,
+    usedLayers,
+    turn: {
+      ...createDefaultExternalMemoryTurnSnapshot(),
+      readAt: params.readAt,
+      usedLayers,
+      summary: params.summary,
+    },
+    sections: params.sections,
+  }
+}
 
 function createManagerDependencies(overrides?: {
   companionCoordinationManager?: Partial<CompanionCoordinationManager>
@@ -25,16 +66,16 @@ function createManagerDependencies(overrides?: {
     getLastMemoryUsage: () => ({
       ...createDefaultExternalMemoryUsageSnapshot(),
       bridgeState: 'ready',
+      reason: createExternalMemoryReasonSnapshot('bridge-ready'),
       summary: 'External memory bridge is healthy.',
       lastReadAt: 100,
       lastReadSummary: 'Loaded trusted external memory.',
       lastUsedDocumentKinds: ['user-profile'],
-      context: {
-        state: 'ready',
+      context: createMemoryContextSnapshot({
         summary: 'Loaded trusted external memory.',
         readAt: 100,
-        documents: [],
         usedKinds: ['user-profile'],
+        usedLayers: ['stable-profile'],
         sections: {
           userProfile: ['Prefers concise replies.'],
           preferences: [],
@@ -42,17 +83,17 @@ function createManagerDependencies(overrides?: {
           recentSummary: [],
           characterKnowledge: [],
         },
-      },
+      }),
     }),
+    clearMemoryWriteCandidateHistory: () => createDefaultExternalMemoryUsageSnapshot(),
     loadMemoryContext: async () => {
       throw new Error('Not used in system-health tests.')
     },
-    refreshMemoryContext: async () => ({
-      state: 'ready',
+    refreshMemoryContext: async () => createMemoryContextSnapshot({
       summary: 'Loaded trusted external memory.',
       readAt: 100,
-      documents: [],
       usedKinds: ['user-profile'],
+      usedLayers: ['stable-profile'],
       sections: {
         userProfile: ['Prefers concise replies.'],
         preferences: [],
@@ -431,17 +472,18 @@ describe('system health manager', () => {
         getLastMemoryUsage: () => ({
           ...createDefaultExternalMemoryUsageSnapshot(),
           bridgeState: 'degraded',
+          reason: createExternalMemoryReasonSnapshot('bridge-degraded'),
           summary: 'Memory root path is unavailable.',
           lastReadAt: 110,
           lastReadError: 'Memory root path is unavailable.',
           lastUsedDocumentKinds: [],
         }),
-        refreshMemoryContext: async () => ({
+        refreshMemoryContext: async () => createMemoryContextSnapshot({
           state: 'degraded',
           summary: 'Memory root path is unavailable.',
           readAt: 110,
-          documents: [],
           usedKinds: [],
+          usedLayers: [],
           sections: {
             userProfile: [],
             preferences: [],

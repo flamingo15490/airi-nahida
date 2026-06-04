@@ -1,3 +1,7 @@
+import type {
+  ExternalMemoryContextSnapshot,
+  ExternalMemoryUsageSnapshot,
+} from './external-memory-shared'
 import type { AiriCard } from './modules'
 
 import { createTestingPinia } from '@pinia/testing'
@@ -6,6 +10,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { setCharacterLlmMarkerParserFactoryForTest, useCharacterStore } from './character'
 import { useCompanionCoordinationStore } from './companion-coordination-store'
+import {
+  createDefaultExternalMemoryTurnSnapshot,
+  createDefaultExternalMemoryUsageSnapshot,
+  createExternalMemoryReasonSnapshot,
+  EXTERNAL_MEMORY_LAYER_KINDS,
+} from './external-memory-shared'
 import { useExternalMemoryStore } from './external-memory-store'
 import { useAiriCardStore } from './modules'
 import { useNahidaPersonaStore } from './nahida-persona-store'
@@ -35,6 +45,42 @@ const openSpeechIntentSpy = vi.fn(() => ({
   end: endSpy,
   cancel: cancelSpy,
 }))
+
+function createMemoryContextSnapshot(): ExternalMemoryContextSnapshot {
+  return {
+    state: 'ready' as const,
+    reason: createExternalMemoryReasonSnapshot('context-loaded'),
+    summary: 'Loaded.',
+    readAt: 1,
+    layerOrder: [...EXTERNAL_MEMORY_LAYER_KINDS],
+    usedKinds: ['user-profile'],
+    usedLayers: ['stable-profile'],
+    documents: [],
+    turn: {
+      ...createDefaultExternalMemoryTurnSnapshot(),
+      readAt: 1,
+      usedLayers: ['stable-profile'],
+      summary: 'Loaded.',
+    },
+    sections: {
+      userProfile: ['The user prefers concise technical replies.'],
+      preferences: [],
+      followUps: [],
+      recentSummary: [],
+      characterKnowledge: [],
+    },
+  }
+}
+
+function createMemoryUsageSnapshot(): ExternalMemoryUsageSnapshot {
+  return {
+    ...createDefaultExternalMemoryUsageSnapshot(),
+    bridgeState: 'ready' as const,
+    reason: createExternalMemoryReasonSnapshot('bridge-ready'),
+    summary: 'Loaded.',
+    lastUsedDocumentKinds: ['user-profile'],
+  }
+}
 
 describe('store character', () => {
   beforeEach(() => {
@@ -142,40 +188,10 @@ describe('store character', () => {
   it('adds the external memory supplement once when trusted memory is available', async () => {
     const memoryStore = useExternalMemoryStore()
     memoryStore.setBridge({
-      loadMemoryContext: async () => ({
-        state: 'ready',
-        summary: 'Loaded.',
-        readAt: 1,
-        usedKinds: ['user-profile'],
-        documents: [],
-        sections: {
-          userProfile: ['The user prefers concise technical replies.'],
-          preferences: [],
-          followUps: [],
-          recentSummary: [],
-          characterKnowledge: [],
-        },
-      }),
-      refreshMemoryContext: async () => ({
-        state: 'ready',
-        summary: 'Loaded.',
-        readAt: 1,
-        usedKinds: ['user-profile'],
-        documents: [],
-        sections: {
-          userProfile: ['The user prefers concise technical replies.'],
-          preferences: [],
-          followUps: [],
-          recentSummary: [],
-          characterKnowledge: [],
-        },
-      }),
-      getLastMemoryUsage: async () => ({
-        bridgeState: 'ready',
-        summary: 'Loaded.',
-        recentWrites: [],
-        lastUsedDocumentKinds: ['user-profile'],
-      }),
+      loadMemoryContext: async () => createMemoryContextSnapshot(),
+      refreshMemoryContext: async () => createMemoryContextSnapshot(),
+      getLastMemoryUsage: async () => createMemoryUsageSnapshot(),
+      clearMemoryWriteCandidateHistory: vi.fn(),
       writeFollowUpItems: vi.fn(),
       writePreferencesPatch: vi.fn(),
       writeRecentSummary: vi.fn(),

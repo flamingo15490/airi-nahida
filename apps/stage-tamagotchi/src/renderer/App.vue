@@ -36,6 +36,7 @@ import {
   electronCompanionCoordinationGetSnapshot,
   electronCompanionCoordinationRefresh,
   electronCompanionCoordinationRefreshForSparkNotify,
+  electronExternalMemoryClearWriteCandidateHistory,
   electronExternalMemoryGetLastUsage,
   electronExternalMemoryLoadContext,
   electronExternalMemoryRefreshContext,
@@ -135,6 +136,7 @@ const saveNahidaPersonaConfig = useElectronEventaInvoke(electronNahidaPersonaSav
 const loadExternalMemoryContext = useElectronEventaInvoke(electronExternalMemoryLoadContext)
 const refreshExternalMemoryContext = useElectronEventaInvoke(electronExternalMemoryRefreshContext)
 const getExternalMemoryUsage = useElectronEventaInvoke(electronExternalMemoryGetLastUsage)
+const clearExternalMemoryWriteCandidateHistory = useElectronEventaInvoke(electronExternalMemoryClearWriteCandidateHistory)
 const writeExternalMemoryRecentSummary = useElectronEventaInvoke(electronExternalMemoryWriteRecentSummary)
 const writeExternalMemoryFollowUpItems = useElectronEventaInvoke(electronExternalMemoryWriteFollowUpItems)
 const writeExternalMemoryUserProfilePatch = useElectronEventaInvoke(electronExternalMemoryWriteUserProfilePatch)
@@ -299,6 +301,7 @@ externalMemoryStore.setBridge({
   loadMemoryContext: request => loadExternalMemoryContext(request),
   refreshMemoryContext: request => refreshExternalMemoryContext(request),
   getLastMemoryUsage: () => getExternalMemoryUsage(),
+  clearMemoryWriteCandidateHistory: () => clearExternalMemoryWriteCandidateHistory(),
   writeRecentSummary: request => writeExternalMemoryRecentSummary(request),
   writeFollowUpItems: request => writeExternalMemoryFollowUpItems(request),
   writeUserProfilePatch: request => writeExternalMemoryUserProfilePatch(request),

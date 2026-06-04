@@ -1,13 +1,46 @@
+import type { ExternalMemoryContextSnapshot } from '@proj-airi/stage-ui/stores/external-memory-shared'
+
 import type { ExternalMemoryManager } from '../external-memory'
 import type { NahidaPersonaManager } from '../nahida-persona'
 import type { ProactiveCompanionManager } from '../proactive-companion'
 
-import { createDefaultExternalMemoryUsageSnapshot } from '@proj-airi/stage-ui/stores/external-memory-shared'
+import {
+  createDefaultExternalMemoryTurnSnapshot,
+  createDefaultExternalMemoryUsageSnapshot,
+  createExternalMemoryReasonSnapshot,
+  EXTERNAL_MEMORY_LAYER_KINDS,
+} from '@proj-airi/stage-ui/stores/external-memory-shared'
 import { createDefaultNahidaPersonaSettings } from '@proj-airi/stage-ui/stores/nahida-persona-shared'
 import { createDefaultProactiveCompanionRuntimeSnapshot } from '@proj-airi/stage-ui/stores/proactive-companion-shared'
 import { describe, expect, it } from 'vitest'
 
 import { createCompanionCoordinationManager } from './index'
+
+function createMemoryContextSnapshot(): ExternalMemoryContextSnapshot {
+  return {
+    state: 'ready' as const,
+    reason: createExternalMemoryReasonSnapshot('context-loaded'),
+    summary: 'Loaded.',
+    readAt: 1,
+    layerOrder: [...EXTERNAL_MEMORY_LAYER_KINDS],
+    usedKinds: ['user-profile'],
+    usedLayers: ['stable-profile'],
+    documents: [],
+    turn: {
+      ...createDefaultExternalMemoryTurnSnapshot(),
+      readAt: 1,
+      usedLayers: ['stable-profile'],
+      summary: 'Loaded.',
+    },
+    sections: {
+      userProfile: ['Prefers concise replies.'],
+      preferences: [],
+      followUps: [],
+      recentSummary: [],
+      characterKnowledge: [],
+    },
+  }
+}
 
 function createDeferred<T>() {
   let resolve!: (value: T | PromiseLike<T>) => void
@@ -32,24 +65,13 @@ function createExternalMemoryManager(): ExternalMemoryManager {
     getLastMemoryUsage: () => ({
       ...createDefaultExternalMemoryUsageSnapshot(),
       bridgeState: 'ready',
+      reason: createExternalMemoryReasonSnapshot('bridge-ready'),
       summary: 'External memory bridge is healthy.',
       lastReadAt: 1,
       lastUsedDocumentKinds: ['user-profile'],
-      context: {
-        state: 'ready',
-        summary: 'Loaded.',
-        readAt: 1,
-        usedKinds: ['user-profile'],
-        documents: [],
-        sections: {
-          userProfile: ['Prefers concise replies.'],
-          preferences: [],
-          followUps: [],
-          recentSummary: [],
-          characterKnowledge: [],
-        },
-      },
+      context: createMemoryContextSnapshot(),
     }),
+    clearMemoryWriteCandidateHistory: () => createDefaultExternalMemoryUsageSnapshot(),
     writeRecentSummary: async () => {
       throw new Error('Not used in companion coordination tests.')
     },
