@@ -19,6 +19,20 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { deriveOverallHealth } from '../../../../shared/system-health'
 import { createSystemHealthManager } from './index'
 
+vi.mock('electron', () => ({
+  ipcMain: {},
+}))
+
+vi.mock('@moeru/eventa/adapters/electron/main', async () => {
+  const eventa = await import('@moeru/eventa')
+  return {
+    createContext: () => ({
+      context: eventa.createContext(),
+      dispose: () => {},
+    }),
+  }
+})
+
 function createMemoryContextSnapshot(params: {
   state?: 'ready' | 'degraded'
   summary: string
@@ -640,16 +654,6 @@ describe('system health service', () => {
 
   it('registers the three frozen Eventa invoke handlers on the main-process context', async () => {
     const handlers = new Map<string, (payload: unknown) => unknown>()
-    const context = {
-      emit: vi.fn(),
-    }
-
-    vi.doMock('@moeru/eventa/adapters/electron/main', () => ({
-      createContext: () => ({
-        context,
-        dispose: () => {},
-      }),
-    }))
 
     vi.doMock('@moeru/eventa', async (importOriginal) => {
       const actual = await importOriginal<typeof import('@moeru/eventa')>()
@@ -661,10 +665,6 @@ describe('system health service', () => {
         },
       }
     })
-
-    vi.doMock('electron', () => ({
-      ipcMain: {},
-    }))
 
     const module = await import('./index')
     const manager = {
