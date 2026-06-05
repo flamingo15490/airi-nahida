@@ -1,6 +1,8 @@
 import type { ChatHistoryItem } from '../types/chat'
 import type {
   ExternalMemoryContextSnapshot,
+  ExternalMemoryJudgementSnapshot,
+  ExternalMemoryObservationRecord,
   ExternalMemoryTurnSnapshot,
   ExternalMemoryUsageSnapshot,
   ExternalMemoryWriteCandidate,
@@ -17,6 +19,7 @@ import { extractMessageText } from '../libs/chat-sync'
 import { useChatSessionStore } from './chat/session-store'
 import { composeExternalMemorySupplement } from './external-memory'
 import {
+  createDefaultExternalMemoryJudgementSnapshot,
   createDefaultExternalMemoryTurnSnapshot,
   createDefaultExternalMemoryUsageSnapshot,
   createDefaultExternalMemoryWriteReviewSnapshot,
@@ -36,6 +39,10 @@ export interface ExternalMemoryBridge {
   loadMemoryContext: (request?: ExternalMemoryLoadRequest) => Promise<ExternalMemoryContextSnapshot>
   refreshMemoryContext: (request?: ExternalMemoryLoadRequest) => Promise<ExternalMemoryContextSnapshot>
   getLastMemoryUsage: () => Promise<ExternalMemoryUsageSnapshot>
+  recordMemoryObservation: (request: ExternalMemoryObservationRecord) => Promise<ExternalMemoryJudgementSnapshot>
+  refreshMemoryJudgement: () => Promise<ExternalMemoryJudgementSnapshot>
+  getMemoryJudgementSnapshot: () => Promise<ExternalMemoryJudgementSnapshot>
+  clearMemoryCandidateLedger: () => Promise<ExternalMemoryJudgementSnapshot>
   clearMemoryWriteCandidateHistory: () => Promise<ExternalMemoryUsageSnapshot>
   writeRecentSummary: (request: ExternalMemoryWriteRequest) => Promise<ExternalMemoryWriteResult>
   writeFollowUpItems: (request: ExternalMemoryWriteRequest) => Promise<ExternalMemoryWriteResult>
@@ -149,6 +156,23 @@ function normalizeWriteReviewSnapshot(snapshot?: ExternalMemoryWriteReviewSnapsh
   }
 }
 
+function normalizeJudgementSnapshot(snapshot?: ExternalMemoryJudgementSnapshot): ExternalMemoryJudgementSnapshot {
+  const defaultSnapshot = createDefaultExternalMemoryJudgementSnapshot()
+  const normalizedSnapshot = snapshot ?? defaultSnapshot
+
+  return {
+    ...defaultSnapshot,
+    ...normalizedSnapshot,
+    statusCounts: {
+      ...defaultSnapshot.statusCounts,
+      ...normalizedSnapshot.statusCounts,
+    },
+    candidates: [...(normalizedSnapshot.candidates ?? defaultSnapshot.candidates)],
+    conflicts: [...(normalizedSnapshot.conflicts ?? defaultSnapshot.conflicts)],
+    recommendations: [...(normalizedSnapshot.recommendations ?? defaultSnapshot.recommendations)],
+  }
+}
+
 function normalizeContextSnapshot(snapshot: ExternalMemoryContextSnapshot): ExternalMemoryContextSnapshot {
   return {
     ...snapshot,
@@ -180,6 +204,7 @@ function normalizeUsageSnapshot(
     ...defaultUsage,
     ...snapshot,
     context: normalizedContext ? normalizeContextSnapshot(normalizedContext) : undefined,
+    judgement: normalizeJudgementSnapshot(snapshot.judgement),
     turn: normalizeTurnSnapshot(snapshot.turn, normalizedContext),
     lastWriteReview: normalizeWriteReviewSnapshot(snapshot.lastWriteReview ?? snapshot.lastWrite?.review),
     recentWrites: [...(snapshot.recentWrites ?? defaultUsage.recentWrites)],
@@ -310,8 +335,11 @@ export const useExternalMemoryStore = defineStore('external-memory', () => {
   const activeSupplement = computed(() => composeExternalMemorySupplement({
     usage: usage.value,
     context: context.value,
+    judgement: judgementSnapshot.value,
+    turn: turnSnapshot.value,
   }))
   const isAvailable = computed(() => usage.value.bridgeState === 'ready' || usage.value.bridgeState === 'degraded')
+  const judgementSnapshot = computed(() => normalizeJudgementSnapshot(usage.value.judgement))
   const turnSnapshot = computed(() => normalizeTurnSnapshot(usage.value.turn, context.value))
   const writeReviewSnapshot = computed(() => normalizeWriteReviewSnapshot(usage.value.lastWriteReview ?? usage.value.lastWrite?.review))
   const latestPersistedWrite = computed(() => {
@@ -332,6 +360,13 @@ export const useExternalMemoryStore = defineStore('external-memory', () => {
   function setUsageSnapshot(nextUsage: ExternalMemoryUsageSnapshot) {
     usage.value = normalizeUsageSnapshot(nextUsage, context.value)
     syncCandidateHistory(usage.value.lastWriteReview)
+  }
+
+  function setJudgementSnapshot(nextJudgement: ExternalMemoryJudgementSnapshot) {
+    usage.value = normalizeUsageSnapshot({
+      ...usage.value,
+      judgement: nextJudgement,
+    }, context.value)
   }
 
   function setBridge(nextBridge: ExternalMemoryBridge) {
@@ -355,6 +390,30 @@ export const useExternalMemoryStore = defineStore('external-memory', () => {
   async function refreshUsage() {
     setUsageSnapshot(await withBridge(activeBridge => activeBridge.getLastMemoryUsage()))
     return usage.value
+  }
+
+  async function recordMemoryObservation(request: ExternalMemoryObservationRecord) {
+    const judgement = await withBridge(activeBridge => activeBridge.recordMemoryObservation(request))
+    setJudgementSnapshot(judgement)
+    return judgementSnapshot.value
+  }
+
+  async function refreshMemoryJudgement() {
+    const judgement = await withBridge(activeBridge => activeBridge.refreshMemoryJudgement())
+    setJudgementSnapshot(judgement)
+    return judgementSnapshot.value
+  }
+
+  async function getMemoryJudgementSnapshot() {
+    const judgement = await withBridge(activeBridge => activeBridge.getMemoryJudgementSnapshot())
+    setJudgementSnapshot(judgement)
+    return judgementSnapshot.value
+  }
+
+  async function clearMemoryCandidateLedger() {
+    const judgement = await withBridge(activeBridge => activeBridge.clearMemoryCandidateLedger())
+    setJudgementSnapshot(judgement)
+    return judgementSnapshot.value
   }
 
   async function loadContext() {
@@ -520,6 +579,7 @@ export const useExternalMemoryStore = defineStore('external-memory', () => {
     context,
     error,
     isAvailable,
+    judgementSnapshot,
     latestPersistedWrite,
     loading,
     refreshing,
@@ -529,10 +589,14 @@ export const useExternalMemoryStore = defineStore('external-memory', () => {
     writing,
 
     clearCandidateHistory,
+    clearMemoryCandidateLedger,
     captureAssistantTurn,
     captureUserTurn,
+    getMemoryJudgementSnapshot,
     loadContext,
+    recordMemoryObservation,
     refreshContext,
+    refreshMemoryJudgement,
     refreshTurnSnapshot,
     refreshUsage,
     refreshWriteReview,

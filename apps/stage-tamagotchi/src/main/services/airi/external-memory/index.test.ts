@@ -10,6 +10,7 @@ const preferencesFileName = '\u504F\u597D\u8BBE\u7F6E.md'
 const followUpsFileName = '\u5F85\u8DDF\u8FDB.md'
 const recentSummaryFileName = '\u8FD1\u671F\u6458\u8981.md'
 const characterKnowledgeDirectoryName = '\u89D2\u8272\u77E5\u8BC6\u5E93'
+const candidateLedgerFileName = 'external-memory-candidate-ledger.json'
 
 function createExternalIntegrationsManager(rootPath: string, state: 'ready' | 'degraded' | 'disabled' = 'ready') {
   return {
@@ -29,6 +30,13 @@ function createExternalIntegrationsManager(rootPath: string, state: 'ready' | 'd
       },
     }],
   }
+}
+
+function createManager(rootPath: string, state: 'ready' | 'degraded' | 'disabled' = 'ready') {
+  return import('./index').then(({ createExternalMemoryManager }) => createExternalMemoryManager({
+    externalIntegrationsManager: createExternalIntegrationsManager(rootPath, state) as never,
+    userDataPath: rootPath,
+  }))
 }
 
 describe('external memory manager', () => {
@@ -65,10 +73,7 @@ describe('external memory manager', () => {
       ].join('\n'),
     )
 
-    const { createExternalMemoryManager } = await import('./index')
-    const manager = createExternalMemoryManager({
-      externalIntegrationsManager: createExternalIntegrationsManager(rootPath) as never,
-    })
+    const manager = await createManager(rootPath)
 
     const context = await manager.refreshMemoryContext({ characterName: 'Nahida' })
 
@@ -101,7 +106,7 @@ describe('external memory manager', () => {
     expect(suppressedRecentFact?.selected).toBe(false)
     expect(suppressedRecentFact?.decisionType).toBe('suppressed-lower-priority')
     expect(suppressedRecentFact?.reason?.code).toBe('layer-empty')
-    expect(suppressedRecentFact?.reason?.detail).toContain('stable profile')
+    expect(suppressedRecentFact?.reason?.detail).toContain('已稳定的用户信息或偏好')
 
     const suppressedFollowUp = context.turn.evidence.find(item => item.text.includes('I might submit'))
     expect(suppressedFollowUp?.selected).toBe(false)
@@ -123,19 +128,14 @@ describe('external memory manager', () => {
       '- habit: speaks calmly and precisely\n',
     )
 
-    const { createExternalMemoryManager } = await import('./index')
-    const manager = createExternalMemoryManager({
-      externalIntegrationsManager: createExternalIntegrationsManager(rootPath) as never,
-    })
+    const manager = await createManager(rootPath)
 
     const mismatchContext = await manager.refreshMemoryContext({ characterName: 'Lumine' })
     expect(mismatchContext.usedKinds).toEqual(['user-profile'])
     expect(mismatchContext.sections.characterKnowledge).toEqual([])
     expect(mismatchContext.turn.selections.find(item => item.layer === 'character-knowledge')?.selected).toBe(false)
 
-    const unavailableManager = createExternalMemoryManager({
-      externalIntegrationsManager: createExternalIntegrationsManager(join(rootPath, 'missing-root')) as never,
-    })
+    const unavailableManager = await createManager(join(rootPath, 'missing-root'))
     const unavailableContext = await unavailableManager.refreshMemoryContext({ characterName: 'Nahida' })
     expect(unavailableContext.state).toBe('degraded')
     expect(unavailableContext.usedKinds).toEqual([])
@@ -157,10 +157,7 @@ describe('external memory manager', () => {
       '',
     ].join('\n'))
 
-    const { createExternalMemoryManager } = await import('./index')
-    const manager = createExternalMemoryManager({
-      externalIntegrationsManager: createExternalIntegrationsManager(rootPath) as never,
-    })
+    const manager = await createManager(rootPath)
 
     const weakPreferenceFirst = await manager.writePreferencesPatch({
       preferences: ['maybe tone: softer'],
@@ -219,10 +216,7 @@ describe('external memory manager', () => {
     )
     await writeFile(join(rootPath, userProfileFileName), '- occupation: student\n')
 
-    const { createExternalMemoryManager } = await import('./index')
-    const manager = createExternalMemoryManager({
-      externalIntegrationsManager: createExternalIntegrationsManager(rootPath) as never,
-    })
+    const manager = await createManager(rootPath)
 
     const duplicateSummary = await manager.writeRecentSummary({
       summary: [
@@ -274,10 +268,7 @@ describe('external memory manager', () => {
       ].join('\n'),
     )
 
-    const { createExternalMemoryManager } = await import('./index')
-    const manager = createExternalMemoryManager({
-      externalIntegrationsManager: createExternalIntegrationsManager(rootPath) as never,
-    })
+    const manager = await createManager(rootPath)
 
     await manager.refreshMemoryContext({ characterName: 'Nahida' })
     const usageBeforeWrite = manager.getLastMemoryUsage()
@@ -302,5 +293,146 @@ describe('external memory manager', () => {
 
     const preferencesText = await readFile(join(rootPath, preferencesFileName), 'utf-8')
     expect(preferencesText).toContain('reply style: concise')
+  })
+
+  it('freezes phase-nine judgement ledger semantics in userData JSON', async () => {
+    const rootPath = await mkdtemp(join(tmpdir(), 'airi-external-memory-judgement-'))
+    const manager = await createManager(rootPath)
+
+    const tentativePreference = await manager.recordMemoryObservation({
+      kind: 'preferences',
+      source: 'user-turn-preferences',
+      text: 'reply style: concise',
+      observedAt: 100,
+    })
+    expect(tentativePreference.candidateLedgerPath).toBe(join(rootPath, candidateLedgerFileName))
+    expect(tentativePreference.candidates[0]?.status).toBe('tentative')
+    expect(tentativePreference.recommendations).toEqual([])
+
+    const stablePreference = await manager.recordMemoryObservation({
+      kind: 'preferences',
+      source: 'user-turn-preferences',
+      text: 'reply style: concise',
+      observedAt: 200,
+    })
+    expect(stablePreference.candidates[0]?.status).toBe('stable')
+    expect(stablePreference.recommendations[0]?.kind).toBe('preferences')
+    expect(stablePreference.recommendations[0]?.addItems).toEqual(['reply style: concise'])
+
+    const strongProfile = await manager.recordMemoryObservation({
+      kind: 'user-profile',
+      source: 'user-turn-profile',
+      text: 'location: Shanghai',
+      strongSignal: true,
+      observedAt: 300,
+    })
+    const strongProfileCandidate = strongProfile.candidates.find(candidate => candidate.kind === 'user-profile')
+    expect(strongProfileCandidate?.status).toBe('stable')
+
+    const stableFollowUp = await manager.recordMemoryObservation({
+      kind: 'follow-ups',
+      source: 'user-turn-follow-ups',
+      text: 'remind me to review the memory PR tomorrow',
+      actionable: true,
+      observedAt: 400,
+    })
+    const followUpCandidate = stableFollowUp.candidates.find(candidate => candidate.kind === 'follow-ups')
+    expect(followUpCandidate?.status).toBe('stable')
+
+    const suppressedSummary = await manager.recordMemoryObservation({
+      kind: 'recent-summary',
+      source: 'assistant-turn-summary',
+      text: 'user: continue phase nine',
+      observedAt: 500,
+    })
+    const summaryCandidate = suppressedSummary.candidates.find(candidate => candidate.kind === 'recent-summary')
+    expect(summaryCandidate?.status).toBe('suppressed')
+    expect(suppressedSummary.recommendations.some(item => item.kind === 'recent-summary')).toBe(false)
+
+    const suppressedCharacterKnowledge = await manager.recordMemoryObservation({
+      kind: 'character-knowledge',
+      source: 'manual-candidate-review',
+      text: 'Nahida-notes.md: habit: speaks calmly and precisely',
+      strongSignal: true,
+      observedAt: 600,
+    })
+    const characterCandidate = suppressedCharacterKnowledge.candidates.find(candidate => candidate.kind === 'character-knowledge')
+    expect(characterCandidate?.status).toBe('suppressed')
+    expect(suppressedCharacterKnowledge.recommendations.some(item => item.kind === 'character-knowledge')).toBe(false)
+
+    const conflictedProfile = await manager.recordMemoryObservation({
+      kind: 'user-profile',
+      source: 'user-turn-profile',
+      text: 'location: Beijing',
+      strongSignal: true,
+      observedAt: 700,
+    })
+    const conflictCandidate = conflictedProfile.candidates.find(candidate => candidate.text === 'location: Beijing')
+    expect(conflictCandidate?.status).toBe('conflicted')
+    expect(conflictedProfile.conflicts.length).toBeGreaterThan(0)
+
+    const ledgerText = await readFile(join(rootPath, candidateLedgerFileName), 'utf-8')
+    expect(ledgerText).toContain('reply style: concise')
+    expect(ledgerText).not.toContain('D:\\AIRI-Memory')
+
+    const cleared = await manager.clearMemoryCandidateLedger()
+    expect(cleared.candidates).toEqual([])
+    expect(cleared.recommendations).toEqual([])
+  })
+
+  it('keeps one evidence count per round for the same normalized candidate', async () => {
+    const rootPath = await mkdtemp(join(tmpdir(), 'airi-external-memory-judgement-round-dedupe-'))
+    const manager = await createManager(rootPath)
+
+    await manager.recordMemoryObservation({
+      kind: 'preferences',
+      source: 'user-turn-preferences',
+      text: 'reply style: concise',
+      observedAt: 1000,
+    })
+    const duplicateSameRound = await manager.recordMemoryObservation({
+      kind: 'preferences',
+      source: 'user-turn-preferences',
+      text: 'reply style: concise',
+      observedAt: 1000,
+    })
+
+    expect(duplicateSameRound.candidates).toHaveLength(1)
+    expect(duplicateSameRound.candidates[0]?.observationCount).toBe(1)
+    expect(duplicateSameRound.candidates[0]?.status).toBe('tentative')
+
+    const nextRound = await manager.recordMemoryObservation({
+      kind: 'preferences',
+      source: 'user-turn-preferences',
+      text: 'reply style: concise',
+      observedAt: 2000,
+    })
+    expect(nextRound.candidates[0]?.observationCount).toBe(2)
+    expect(nextRound.candidates[0]?.status).toBe('stable')
+  })
+
+  it('marks a new stable-profile candidate as conflicted when it collides with persisted stable memory', async () => {
+    const rootPath = await mkdtemp(join(tmpdir(), 'airi-external-memory-persisted-conflict-'))
+    await writeFile(join(rootPath, userProfileFileName), [
+      '- location: Shanghai',
+      '',
+    ].join('\n'))
+
+    const manager = await createManager(rootPath)
+
+    const conflicted = await manager.recordMemoryObservation({
+      kind: 'user-profile',
+      source: 'user-turn-profile',
+      text: 'location: Beijing',
+      strongSignal: true,
+      observedAt: 100,
+    })
+
+    expect(conflicted.candidates[0]?.status).toBe('conflicted')
+    expect(conflicted.candidates[0]?.reason).toContain('stable memory')
+    expect(conflicted.conflicts).toHaveLength(1)
+    expect(conflicted.conflicts[0]?.existingText).toBe('location: Shanghai')
+    expect(conflicted.conflicts[0]?.incomingText).toBe('location: Beijing')
+    expect(conflicted.recommendations).toEqual([])
   })
 })

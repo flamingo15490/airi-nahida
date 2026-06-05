@@ -15,6 +15,7 @@ const {
   context,
   error,
   isAvailable,
+  judgementSnapshot,
   latestPersistedWrite,
   loading,
   refreshing,
@@ -36,6 +37,35 @@ const stateToneMap = {
 
 const latestWrite = computed(() => usage.value.lastWrite)
 const recentWrites = computed(() => usage.value.recentWrites.slice(0, 4))
+const candidateLastSeenAtMap = computed(() => {
+  return new Map(judgementSnapshot.value.candidates.map(candidate => [candidate.id, candidate.lastObservedAt]))
+})
+const recentJudgementCandidates = computed(() => {
+  return [...judgementSnapshot.value.candidates]
+    .sort((left, right) => right.lastObservedAt - left.lastObservedAt)
+    .slice(0, 6)
+})
+const recentJudgementConflicts = computed(() => {
+  return [...judgementSnapshot.value.conflicts]
+    .sort((left, right) => {
+      return (candidateLastSeenAtMap.value.get(right.candidateId) ?? 0) - (candidateLastSeenAtMap.value.get(left.candidateId) ?? 0)
+    })
+    .slice(0, 6)
+})
+const recentJudgementRecommendations = computed(() => {
+  return [...judgementSnapshot.value.recommendations].slice(0, 6)
+})
+const judgementStatusEntries = computed(() => {
+  return [
+    { key: 'tentative', label: '候选中', count: judgementSnapshot.value.statusCounts.tentative },
+    { key: 'stable', label: '已稳定', count: judgementSnapshot.value.statusCounts.stable },
+    { key: 'conflicted', label: '有冲突', count: judgementSnapshot.value.statusCounts.conflicted },
+    { key: 'suppressed', label: '已压制', count: judgementSnapshot.value.statusCounts.suppressed },
+  ] as const
+})
+const judgementObservationCount = computed(() => {
+  return judgementSnapshot.value.candidates.reduce((count, candidate) => count + candidate.observationCount, 0)
+})
 const layerSummaries = computed(() => {
   return turnSnapshot.value.layerOrder.map((layer) => {
     const selection = turnSnapshot.value.selections.find(item => item.layer === layer)
@@ -90,6 +120,34 @@ function formatWriteDecision(decision?: string) {
       return '已跳过：不够稳定'
     default:
       return '未知'
+  }
+}
+
+function formatCandidateStatus(status: string) {
+  switch (status) {
+    case 'tentative':
+      return '候选中'
+    case 'stable':
+      return '已稳定'
+    case 'conflicted':
+      return '有冲突'
+    case 'suppressed':
+      return '已压制'
+    default:
+      return status
+  }
+}
+
+function candidateStatusTone(status: string) {
+  switch (status) {
+    case 'stable':
+      return 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
+    case 'conflicted':
+      return 'bg-rose-500/15 text-rose-700 dark:text-rose-300'
+    case 'suppressed':
+      return 'bg-neutral-500/15 text-neutral-700 dark:text-neutral-300'
+    default:
+      return 'bg-amber-500/15 text-amber-700 dark:text-amber-300'
   }
 }
 
@@ -171,9 +229,30 @@ async function clearCandidateHistoryPanel() {
   }
 }
 
+async function refreshJudgementPanel() {
+  try {
+    await memoryStore.refreshMemoryJudgement()
+    toast.success('记忆判定已刷新。')
+  }
+  catch (cause) {
+    toast.error(String(error.value ?? cause))
+  }
+}
+
+async function clearCandidateLedgerPanel() {
+  try {
+    await memoryStore.clearMemoryCandidateLedger()
+    toast.success('候选账本已清空。')
+  }
+  catch (cause) {
+    toast.error(String(error.value ?? cause))
+  }
+}
+
 onMounted(() => {
   void memoryStore.refreshUsage().catch(() => {})
   void memoryStore.loadContext().catch(() => {})
+  void memoryStore.getMemoryJudgementSnapshot().catch(() => {})
 })
 </script>
 
@@ -301,6 +380,236 @@ onMounted(() => {
           {{ t('settings.pages.memory.documents.empty') }}
         </div>
       </article>
+    </section>
+
+    <section :class="['flex', 'flex-col', 'gap-3', 'rounded-xl', 'border', 'border-neutral-200', 'bg-white/80', 'p-4', 'dark:border-neutral-800', 'dark:bg-neutral-900/40']">
+      <div :class="['flex', 'items-start', 'justify-between', 'gap-3']">
+        <div :class="['flex', 'flex-col', 'gap-1']">
+          <h3 :class="['text-sm', 'font-semibold']">
+            记忆判定
+          </h3>
+          <p :class="['text-xs', 'text-neutral-500', 'dark:text-neutral-400']">
+            只读展示候选、冲突、写回建议与候选账本的当前判定快照，不介入主进程判定逻辑。
+          </p>
+        </div>
+
+        <div :class="['flex', 'flex-wrap', 'justify-end', 'gap-2']">
+          <Button
+            variant="secondary"
+            size="sm"
+            :disabled="loading || refreshing || writing"
+            label="刷新判定"
+            icon="i-solar:restart-bold-duotone"
+            @click="refreshJudgementPanel()"
+          />
+          <Button
+            variant="ghost"
+            size="sm"
+            :disabled="loading || refreshing || writing"
+            label="清空候选账本"
+            icon="i-solar:trash-bin-trash-bold-duotone"
+            @click="clearCandidateLedgerPanel()"
+          />
+        </div>
+      </div>
+
+      <div :class="['grid', 'gap-2', 'rounded-lg', 'bg-neutral-50', 'p-3', 'text-xs', 'dark:bg-neutral-950/40', 'md:grid-cols-2']">
+        <div :class="['text-neutral-600', 'dark:text-neutral-300']">
+          <span :class="['font-medium', 'text-neutral-800', 'dark:text-neutral-100']">判定时间：</span>
+          {{ formatTimestamp(judgementSnapshot.refreshedAt) }}
+        </div>
+        <div :class="['text-neutral-600', 'dark:text-neutral-300']">
+          <span :class="['font-medium', 'text-neutral-800', 'dark:text-neutral-100']">statusCounts：</span>
+          {{ judgementStatusEntries.map(entry => `${entry.label} ${entry.count}`).join('，') }}
+        </div>
+        <div :class="['text-neutral-600', 'dark:text-neutral-300']">
+          <span :class="['font-medium', 'text-neutral-800', 'dark:text-neutral-100']">观察总数 / observationCount：</span>
+          {{ judgementObservationCount }}
+        </div>
+        <div :class="['text-neutral-600', 'dark:text-neutral-300']">
+          <span :class="['font-medium', 'text-neutral-800', 'dark:text-neutral-100']">摘要：</span>
+          {{ judgementSnapshot.summary }}
+        </div>
+        <div :class="['text-neutral-600', 'dark:text-neutral-300', 'md:col-span-2']">
+          <span :class="['font-medium', 'text-neutral-800', 'dark:text-neutral-100']">原因：</span>
+          {{ judgementSnapshot.reason }}
+        </div>
+        <div
+          v-if="judgementSnapshot.candidateLedgerPath"
+          :class="['break-all', 'text-neutral-600', 'dark:text-neutral-300', 'md:col-span-2']"
+        >
+          <span :class="['font-medium', 'text-neutral-800', 'dark:text-neutral-100']">候选账本：</span>
+          {{ judgementSnapshot.candidateLedgerPath }}
+        </div>
+      </div>
+
+      <div :class="['grid', 'gap-3', 'xl:grid-cols-3']">
+        <article :class="['flex', 'flex-col', 'gap-2', 'rounded-lg', 'border', 'border-neutral-200', 'bg-neutral-50/80', 'p-3', 'dark:border-neutral-800', 'dark:bg-neutral-950/40']">
+          <div :class="['flex', 'flex-col', 'gap-1']">
+            <h4 :class="['text-sm', 'font-semibold']">
+              最近候选
+            </h4>
+            <p :class="['text-xs', 'text-neutral-500', 'dark:text-neutral-400']">
+              展示最近更新的候选及其候选状态、证据数、时间和最新原因。
+            </p>
+          </div>
+
+          <div
+            v-if="recentJudgementCandidates.length > 0"
+            :class="['flex', 'flex-col', 'gap-2']"
+          >
+            <div
+              v-for="candidate in recentJudgementCandidates"
+              :key="candidate.id"
+              :class="['rounded-lg', 'border', 'border-neutral-200', 'bg-white/80', 'p-3', 'text-xs', 'dark:border-neutral-800', 'dark:bg-neutral-900/40']"
+            >
+              <div :class="['flex', 'items-start', 'justify-between', 'gap-2']">
+                <div :class="['font-medium', 'text-neutral-800', 'dark:text-neutral-100']">
+                  {{ t(`settings.pages.memory.documents.${candidate.kind}.title`) }}
+                </div>
+                <span
+                  :class="[
+                    'inline-flex', 'items-center', 'rounded-full', 'px-2', 'py-0.5', 'text-[11px]', 'font-medium',
+                    candidateStatusTone(candidate.status),
+                  ]"
+                >
+                  {{ formatCandidateStatus(candidate.status) }}
+                </span>
+              </div>
+              <div :class="['mt-1', 'text-neutral-600', 'dark:text-neutral-300']">
+                {{ candidate.text }}
+              </div>
+              <div :class="['mt-1', 'text-neutral-500', 'dark:text-neutral-400']">
+                判定：{{ candidate.summary }}
+              </div>
+              <div :class="['mt-1', 'text-neutral-500', 'dark:text-neutral-400']">
+                候选状态：{{ formatCandidateStatus(candidate.status) }}
+              </div>
+              <div :class="['mt-1', 'text-neutral-500', 'dark:text-neutral-400']">
+                证据数：{{ candidate.observationCount }}
+              </div>
+              <div :class="['mt-1', 'text-neutral-500', 'dark:text-neutral-400']">
+                observationCount：{{ candidate.observationCount }}
+              </div>
+              <div :class="['mt-1', 'text-neutral-500', 'dark:text-neutral-400']">
+                firstSeenAt：{{ formatTimestamp(candidate.firstObservedAt) }}
+              </div>
+              <div :class="['mt-1', 'text-neutral-500', 'dark:text-neutral-400']">
+                lastSeenAt：{{ formatTimestamp(candidate.lastObservedAt) }}
+              </div>
+              <div :class="['mt-1', 'text-neutral-500', 'dark:text-neutral-400']">
+                最新原因：{{ candidate.reason }}
+              </div>
+            </div>
+          </div>
+
+          <div
+            v-else
+            :class="['text-xs', 'text-neutral-500', 'dark:text-neutral-400']"
+          >
+            当前暂无候选。
+          </div>
+        </article>
+
+        <article :class="['flex', 'flex-col', 'gap-2', 'rounded-lg', 'border', 'border-neutral-200', 'bg-neutral-50/80', 'p-3', 'dark:border-neutral-800', 'dark:bg-neutral-950/40']">
+          <div :class="['flex', 'flex-col', 'gap-1']">
+            <h4 :class="['text-sm', 'font-semibold']">
+              最近冲突
+            </h4>
+            <p :class="['text-xs', 'text-neutral-500', 'dark:text-neutral-400']">
+              展示当前判定里最近关联的冲突及原因，帮助查看哪些候选被卡在冲突态。
+            </p>
+          </div>
+
+          <div
+            v-if="recentJudgementConflicts.length > 0"
+            :class="['flex', 'flex-col', 'gap-2']"
+          >
+            <div
+              v-for="conflict in recentJudgementConflicts"
+              :key="conflict.id"
+              :class="['rounded-lg', 'border', 'border-neutral-200', 'bg-white/80', 'p-3', 'text-xs', 'dark:border-neutral-800', 'dark:bg-neutral-900/40']"
+            >
+              <div :class="['font-medium', 'text-neutral-800', 'dark:text-neutral-100']">
+                {{ t(`settings.pages.memory.documents.${conflict.kind}.title`) }}
+              </div>
+              <div :class="['mt-1', 'text-neutral-600', 'dark:text-neutral-300']">
+                {{ conflict.summary }}
+              </div>
+              <div
+                v-if="conflict.structuredKey"
+                :class="['mt-1', 'text-neutral-500', 'dark:text-neutral-400']"
+              >
+                structuredKey：{{ conflict.structuredKey }}
+              </div>
+              <div
+                v-if="conflict.existingText"
+                :class="['mt-1', 'text-neutral-500', 'dark:text-neutral-400']"
+              >
+                已有内容：{{ conflict.existingText }}
+              </div>
+              <div :class="['mt-1', 'text-neutral-500', 'dark:text-neutral-400']">
+                候选内容：{{ conflict.incomingText }}
+              </div>
+              <div :class="['mt-1', 'text-neutral-500', 'dark:text-neutral-400']">
+                原因：{{ conflict.reason }}
+              </div>
+            </div>
+          </div>
+
+          <div
+            v-else
+            :class="['text-xs', 'text-neutral-500', 'dark:text-neutral-400']"
+          >
+            当前暂无冲突。
+          </div>
+        </article>
+
+        <article :class="['flex', 'flex-col', 'gap-2', 'rounded-lg', 'border', 'border-neutral-200', 'bg-neutral-50/80', 'p-3', 'dark:border-neutral-800', 'dark:bg-neutral-950/40']">
+          <div :class="['flex', 'flex-col', 'gap-1']">
+            <h4 :class="['text-sm', 'font-semibold']">
+              最近写回建议
+            </h4>
+            <p :class="['text-xs', 'text-neutral-500', 'dark:text-neutral-400']">
+              展示 recommendation 的候选批次、候选数量和写回建议原因，不扩展成人工审批界面。
+            </p>
+          </div>
+
+          <div
+            v-if="recentJudgementRecommendations.length > 0"
+            :class="['flex', 'flex-col', 'gap-2']"
+          >
+            <div
+              v-for="recommendation in recentJudgementRecommendations"
+              :key="`${recommendation.kind}-${recommendation.candidateIds.join('|')}`"
+              :class="['rounded-lg', 'border', 'border-neutral-200', 'bg-white/80', 'p-3', 'text-xs', 'dark:border-neutral-800', 'dark:bg-neutral-900/40']"
+            >
+              <div :class="['font-medium', 'text-neutral-800', 'dark:text-neutral-100']">
+                {{ t(`settings.pages.memory.documents.${recommendation.kind}.title`) }}
+              </div>
+              <div :class="['mt-1', 'text-neutral-600', 'dark:text-neutral-300']">
+                {{ recommendation.summary }}
+              </div>
+              <div :class="['mt-1', 'text-neutral-500', 'dark:text-neutral-400']">
+                candidateIds：{{ recommendation.candidateIds.length }}
+              </div>
+              <div :class="['mt-1', 'text-neutral-500', 'dark:text-neutral-400']">
+                写回建议：{{ recommendation.addItems.join(' | ') || '无' }}
+              </div>
+              <div :class="['mt-1', 'text-neutral-500', 'dark:text-neutral-400']">
+                原因：{{ recommendation.reason }}
+              </div>
+            </div>
+          </div>
+
+          <div
+            v-else
+            :class="['text-xs', 'text-neutral-500', 'dark:text-neutral-400']"
+          >
+            当前暂无写回建议。
+          </div>
+        </article>
+      </div>
     </section>
 
     <section :class="['flex', 'flex-col', 'gap-3', 'rounded-xl', 'border', 'border-neutral-200', 'bg-white/80', 'p-4', 'dark:border-neutral-800', 'dark:bg-neutral-900/40']">

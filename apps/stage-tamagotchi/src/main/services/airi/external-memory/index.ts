@@ -1,13 +1,20 @@
 import type { createContext } from '@moeru/eventa/adapters/electron/main'
 
 import type {
+  ExternalMemoryCandidateKind,
+  ExternalMemoryCandidateSnapshot,
+  ExternalMemoryCandidateStatus,
   ExternalMemoryCapabilityState,
   ExternalMemoryCitationSnapshot,
+  ExternalMemoryConflictSnapshot,
   ExternalMemoryContextSnapshot,
   ExternalMemoryDocumentKind,
   ExternalMemoryEvidenceSnapshot,
+  ExternalMemoryJudgementSnapshot,
   ExternalMemoryLayerKind,
   ExternalMemoryLoadRequest,
+  ExternalMemoryObservationRecord,
+  ExternalMemoryObservationSource,
   ExternalMemoryReadSnapshot,
   ExternalMemorySelectionDecision,
   ExternalMemoryTurnSnapshot,
@@ -15,6 +22,7 @@ import type {
   ExternalMemoryWriteCandidate,
   ExternalMemoryWriteCandidateDecision,
   ExternalMemoryWriteDecision,
+  ExternalMemoryWriteRecommendation,
   ExternalMemoryWriteRequest,
   ExternalMemoryWriteResult,
   ExternalMemoryWriteReviewSnapshot,
@@ -28,16 +36,21 @@ import { defineInvokeHandler } from '@moeru/eventa'
 import { errorMessageFrom } from '@moeru/std'
 
 import {
+  electronExternalMemoryClearMemoryCandidateLedger,
   electronExternalMemoryClearWriteCandidateHistory,
   electronExternalMemoryGetLastUsage,
+  electronExternalMemoryGetMemoryJudgementSnapshot,
   electronExternalMemoryLoadContext,
+  electronExternalMemoryRecordMemoryObservation,
   electronExternalMemoryRefreshContext,
+  electronExternalMemoryRefreshMemoryJudgement,
   electronExternalMemoryWriteFollowUpItems,
   electronExternalMemoryWritePreferencesPatch,
   electronExternalMemoryWriteRecentSummary,
   electronExternalMemoryWriteUserProfilePatch,
 } from '../../../../shared/eventa'
 import {
+  createDefaultExternalMemoryJudgementSnapshot,
   createDefaultExternalMemoryTurnSnapshot,
   createDefaultExternalMemoryUsageSnapshot,
   createDefaultExternalMemoryWriteReviewSnapshot,
@@ -59,6 +72,11 @@ interface ExistingItemSnapshot {
   normalized: string
   original: string
   key?: string
+}
+
+interface PersistedMemoryRecommendationContext {
+  existingNormalizedByKind: Map<ExternalMemoryCandidateKind, Map<string, ExistingItemSnapshot>>
+  existingStructuredKeyByKind: Map<Extract<ExternalMemoryCandidateKind, 'user-profile' | 'preferences'>, Map<string, ExistingItemSnapshot>>
 }
 
 interface ReviewedStableWriteCandidate {
@@ -85,18 +103,40 @@ interface MemoryRootResolution {
   rootPath?: string
 }
 
-const userProfileFileName = '用户信息.md'
-const preferencesFileName = '偏好设置.md'
-const followUpsFileName = '待跟进.md'
-const recentSummaryFileName = '近期摘要.md'
-const characterKnowledgeDirectoryName = '角色知识库'
+interface ExternalMemoryCandidateLedgerEntry {
+  kind: ExternalMemoryCandidateKind
+  source: ExternalMemoryObservationSource
+  text: string
+  normalizedText: string
+  structuredKey?: string
+  characterName?: string
+  firstObservedAt: number
+  lastObservedAt: number
+  observationCount: number
+  strongSignal: boolean
+  actionable: boolean
+  lastCountedObservedAt?: number
+}
+
+interface ExternalMemoryCandidateLedgerFile {
+  version: 1
+  candidates: ExternalMemoryCandidateLedgerEntry[]
+}
+
+const userProfileFileName = '\u7528\u6237\u4FE1\u606F.md'
+const preferencesFileName = '\u504F\u597D\u8BBE\u7F6E.md'
+const followUpsFileName = '\u5F85\u8DDF\u8FDB.md'
+const recentSummaryFileName = '\u8FD1\u671F\u6458\u8981.md'
+const characterKnowledgeDirectoryName = '\u89D2\u8272\u77E5\u8BC6\u5E93'
+const candidateLedgerFileName = 'external-memory-candidate-ledger.json'
 const maxRecentWrites = 8
 const maxStructuredItemsPerDocument = 8
 const maxRecentSummaryItems = 10
 const followUpDatePrefixPattern = /^\[\d{4}-\d{2}-\d{2}\]\s*/
 const recentSummaryDateHeadingPattern = /^\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}$/
-const temporaryPreferencePattern = /(今天|这次|暂时|如果可以|比如|for now|this time|temporarily|if possible|for example)/i
-const weakStableSignalPattern = /(可能|也许|有时|暂时|最近|这阵子|尽量|如果可以|想要|希望|大概|maybe|probably|sometimes|for now|recently|currently|if possible|would like|prefer if possible)/i
+const temporaryPreferencePattern = /(今天先|这次先|暂时|如果可以|比如|for now|this time|temporarily|if possible|for example)/i
+const weakStableSignalPattern = /(可能|也许|有时|最近|这阵子|尽量|想要|希望|大概|maybe|probably|sometimes|for now|recently|currently|if possible|would like|prefer if possible)/i
+const strongStableSignalPattern = /(一直|长期|固定|永远|以后都|总是|always|forever|long-term|permanently|from now on)/i
 const actionableFollowUpPattern = /(提醒|记得|之后帮我|待会帮我|明天提醒我|后续跟进|稍后再问我|跟进|回头提醒|remind me|please remind me|remember to|follow up|check back|ping me|nudge me)/i
 
 /**
@@ -237,6 +277,41 @@ function buildExistingKeyMap(items: string[]) {
   }
 
   return keyMap
+}
+
+async function readPersistedStableItems(rootPath: string, kind: 'user-profile' | 'preferences' | 'follow-ups') {
+  const fileName = kind === 'user-profile'
+    ? userProfileFileName
+    : kind === 'preferences'
+      ? preferencesFileName
+      : followUpsFileName
+  const text = await readOptionalText(join(rootPath, fileName))
+  return takeMeaningfulLines(text ?? '', Number.MAX_SAFE_INTEGER)
+}
+
+async function buildPersistedMemoryRecommendationContext(rootPath?: string): Promise<PersistedMemoryRecommendationContext> {
+  const existingNormalizedByKind = new Map<ExternalMemoryCandidateKind, Map<string, ExistingItemSnapshot>>()
+  const existingStructuredKeyByKind = new Map<Extract<ExternalMemoryCandidateKind, 'user-profile' | 'preferences'>, Map<string, ExistingItemSnapshot>>()
+
+  if (!rootPath)
+    return { existingNormalizedByKind, existingStructuredKeyByKind }
+
+  const [userProfileItems, preferenceItems, followUpItems] = await Promise.all([
+    readPersistedStableItems(rootPath, 'user-profile'),
+    readPersistedStableItems(rootPath, 'preferences'),
+    readPersistedStableItems(rootPath, 'follow-ups'),
+  ])
+
+  existingNormalizedByKind.set('user-profile', buildExistingItemMap(userProfileItems))
+  existingNormalizedByKind.set('preferences', buildExistingItemMap(preferenceItems))
+  existingNormalizedByKind.set('follow-ups', buildExistingItemMap(followUpItems))
+  existingStructuredKeyByKind.set('user-profile', buildExistingKeyMap(userProfileItems))
+  existingStructuredKeyByKind.set('preferences', buildExistingKeyMap(preferenceItems))
+
+  return {
+    existingNormalizedByKind,
+    existingStructuredKeyByKind,
+  }
 }
 
 function inferCharacterName(request?: ExternalMemoryLoadRequest) {
@@ -390,7 +465,7 @@ function buildTurnSnapshot(params: {
       let decisionType: ExternalMemoryEvidenceSnapshot['decisionType'] = 'suppressed-empty'
       let reason = createEvidenceReason({
         code: 'layer-empty',
-        detail: '已压制：该条目在规范化后没有保留有意义的 JSON-safe 内容。',
+        detail: '已压制：这条内容在归一化后没有保留有意义且 JSON-safe 的信息。',
       })
       let suppressedByEvidenceId: string | undefined
 
@@ -398,21 +473,21 @@ function buildTurnSnapshot(params: {
         decisionType = 'suppressed-empty'
         reason = createEvidenceReason({
           code: 'layer-empty',
-          detail: '已压制：该条目在规范化后没有保留有意义的 JSON-safe 内容。',
+          detail: '已压制：这条内容在归一化后没有保留有意义且 JSON-safe 的信息。',
         })
       }
       else if (document.kind === 'follow-ups' && !isActionableFollowUpLine(item)) {
         decisionType = 'suppressed-not-actionable'
         reason = createEvidenceReason({
           code: 'layer-empty',
-          detail: '已压制：待跟进记忆只接受明确的动作或提醒内容。',
+          detail: '已压制：待跟进记忆只接收明确动作或提醒事项。',
         })
       }
       else if (document.kind === 'character-knowledge' && !params.matchedCharacterKnowledge) {
         decisionType = 'suppressed-character-mismatch'
         reason = createEvidenceReason({
           code: 'layer-empty',
-          detail: '已压制：角色知识库只会在当前角色命中时参与。',
+          detail: '已压制：角色知识仅在当前角色匹配时参与。',
         })
       }
       else {
@@ -429,8 +504,8 @@ function buildTurnSnapshot(params: {
           reason = createEvidenceReason({
             code: 'layer-empty',
             detail: duplicate.layer === document.layer
-              ? '已压制：同一层中已有等价条目被选中。'
-              : '已压制：更高优先级的层已经确定了相同内容。',
+              ? '已压制：同一层内已有等价内容被选中。'
+              : '已压制：更高优先级的层已经选中了相同内容。',
           })
           suppressedByEvidenceId = duplicate.id
         }
@@ -438,7 +513,7 @@ function buildTurnSnapshot(params: {
           decisionType = 'suppressed-lower-priority'
           reason = createEvidenceReason({
             code: 'layer-empty',
-            detail: '已压制：稳定用户信息或稳定偏好设置会覆盖更低优先级的近期上下文。',
+            detail: '已压制：已稳定的用户信息或偏好会覆盖低优先级的近期上下文。',
           })
           suppressedByEvidenceId = stableConflict.id
         }
@@ -447,7 +522,7 @@ function buildTurnSnapshot(params: {
           decisionType = 'selected'
           reason = createEvidenceReason({
             code: 'layer-selected',
-            detail: '已选中：该条目在分层与规范化后进入了最近一次记忆快照。',
+            detail: '已选中：这条内容在分层与归一化后进入了最新记忆快照。',
           })
         }
       }
@@ -676,7 +751,7 @@ async function readCharacterKnowledge(rootPath: string, characterName?: string):
           kind: 'character-knowledge',
           path: knowledgeDirectoryPath,
           available: false,
-          summary: '角色知识库目录缺失。',
+          summary: '角色知识目录缺失。',
         }),
       }
     }
@@ -695,17 +770,17 @@ async function readCharacterKnowledge(rootPath: string, characterName?: string):
           kind: 'character-knowledge',
           path: knowledgeDirectoryPath,
           available: true,
-          summary: '角色知识库目录可用，但当前角色未命中任何知识文件。',
+          summary: '角色知识目录可用，但没有匹配当前角色的文件。',
         }),
       }
     }
 
     const prioritizedEntries = [
       ...matchedCharacterEntries,
-      '核心人格.md',
-      '语言风格.md',
-      '红线清单.md',
-      '人际关系.md',
+      '\u6838\u5FC3\u4EBA\u683C.md',
+      '\u8BED\u8A00\u98CE\u683C.md',
+      '\u7EA2\u7EBF\u6E05\u5355.md',
+      '\u4EBA\u9645\u5173\u7CFB.md',
     ]
       .filter((entry, index, array) => array.indexOf(entry) === index)
       .filter(entry => entries.includes(entry))
@@ -731,7 +806,7 @@ async function readCharacterKnowledge(rootPath: string, characterName?: string):
         available: true,
         summary: collectedItems.length > 0
           ? '已为当前角色选取轻量角色知识片段。'
-          : '角色知识文件可用，但没有提取到可用片段。',
+          : '角色知识文件可用，但没有提取出可用片段。',
         items: collectedItems.slice(0, maxStructuredItemsPerDocument),
       }),
     }
@@ -776,10 +851,10 @@ function summarizeCandidate(kind: ExternalMemoryDocumentKind, decisions: Externa
     'preferences': '偏好设置',
     'follow-ups': '待跟进',
     'recent-summary': '近期摘要',
-    'character-knowledge': '角色知识库',
+    'character-knowledge': '角色知识',
   } satisfies Record<ExternalMemoryDocumentKind, string>
 
-  return `已评审${kindLabel[kind]}：${selectedAdds} 条新增、${selectedRemovals} 条移除、${suppressed} 条已压制。`
+  return `已评审${kindLabel[kind]}：新增 ${selectedAdds} 条，移除 ${selectedRemovals} 条，压制 ${suppressed} 条。`
 }
 
 function appendBulletLines(existingText: string, items: string[]) {
@@ -869,6 +944,10 @@ export interface ExternalMemoryManager {
   loadMemoryContext: (request?: ExternalMemoryLoadRequest) => Promise<ExternalMemoryContextSnapshot>
   refreshMemoryContext: (request?: ExternalMemoryLoadRequest) => Promise<ExternalMemoryContextSnapshot>
   getLastMemoryUsage: () => ExternalMemoryUsageSnapshot
+  recordMemoryObservation: (request: ExternalMemoryObservationRecord) => Promise<ExternalMemoryJudgementSnapshot>
+  refreshMemoryJudgement: () => Promise<ExternalMemoryJudgementSnapshot>
+  getMemoryJudgementSnapshot: () => Promise<ExternalMemoryJudgementSnapshot>
+  clearMemoryCandidateLedger: () => Promise<ExternalMemoryJudgementSnapshot>
   clearMemoryWriteCandidateHistory: () => ExternalMemoryUsageSnapshot
   writeRecentSummary: (request: ExternalMemoryWriteRequest) => Promise<ExternalMemoryWriteResult>
   writeFollowUpItems: (request: ExternalMemoryWriteRequest) => Promise<ExternalMemoryWriteResult>
@@ -878,9 +957,11 @@ export interface ExternalMemoryManager {
 
 export function createExternalMemoryManager(params: {
   externalIntegrationsManager: ExternalIntegrationsManager
+  userDataPath: string
 }): ExternalMemoryManager {
   let lastUsage = createDefaultExternalMemoryUsageSnapshot()
   const writeOccurrenceMaps = new Map<ExternalMemoryDocumentKind, Map<string, number>>()
+  const candidateLedgerPath = join(params.userDataPath, candidateLedgerFileName)
 
   function getOccurrenceCount(kind: ExternalMemoryDocumentKind, normalizedText: string) {
     const kindMap = writeOccurrenceMaps.get(kind) ?? new Map<string, number>()
@@ -890,6 +971,306 @@ export function createExternalMemoryManager(params: {
     const nextCount = (kindMap.get(normalizedText) ?? 0) + 1
     kindMap.set(normalizedText, nextCount)
     return nextCount
+  }
+
+  async function readCandidateLedgerFile(): Promise<ExternalMemoryCandidateLedgerFile> {
+    try {
+      const text = await readFile(candidateLedgerPath, 'utf-8')
+      const parsed = JSON.parse(text) as Partial<ExternalMemoryCandidateLedgerFile>
+      return {
+        version: 1,
+        candidates: Array.isArray(parsed.candidates) ? parsed.candidates : [],
+      }
+    }
+    catch {
+      return {
+        version: 1,
+        candidates: [],
+      }
+    }
+  }
+
+  async function writeCandidateLedgerFile(ledger: ExternalMemoryCandidateLedgerFile) {
+    await mkdir(dirname(candidateLedgerPath), { recursive: true })
+    await writeFile(candidateLedgerPath, JSON.stringify(ledger, null, 2), 'utf-8')
+  }
+
+  function isStrongStableObservation(observation: ExternalMemoryObservationRecord, normalizedText: string) {
+    if (observation.strongSignal)
+      return true
+
+    if (observation.kind === 'follow-ups')
+      return observation.actionable === true || actionableFollowUpPattern.test(normalizedText)
+
+    if (observation.kind === 'preferences' || observation.kind === 'user-profile')
+      return strongStableSignalPattern.test(observation.text)
+
+    return false
+  }
+
+  function deriveCandidateStatus(params: {
+    entry: ExternalMemoryCandidateLedgerEntry
+    conflictingEntries: ExternalMemoryCandidateLedgerEntry[]
+    persistedStructuredConflict?: ExistingItemSnapshot
+  }): ExternalMemoryCandidateStatus {
+    const { entry, conflictingEntries, persistedStructuredConflict } = params
+
+    if (entry.kind === 'recent-summary' || entry.kind === 'character-knowledge')
+      return 'suppressed'
+
+    if (entry.kind === 'follow-ups')
+      return entry.actionable ? 'stable' : 'suppressed'
+
+    if (entry.kind === 'preferences' && temporaryPreferencePattern.test(entry.text))
+      return 'suppressed'
+
+    if (conflictingEntries.length > 0 || persistedStructuredConflict)
+      return 'conflicted'
+
+    if (entry.strongSignal)
+      return 'stable'
+
+    return entry.observationCount >= 2 ? 'stable' : 'tentative'
+  }
+
+  function buildCandidateReason(params: {
+    entry: ExternalMemoryCandidateLedgerEntry
+    status: ExternalMemoryCandidateStatus
+    conflictingEntries: ExternalMemoryCandidateLedgerEntry[]
+    persistedStructuredConflict?: ExistingItemSnapshot
+  }) {
+    if (params.status === 'suppressed') {
+      if (params.entry.kind === 'recent-summary')
+        return '近期摘要只用于短期连续性，不进入 stable candidate ledger。'
+      if (params.entry.kind === 'character-knowledge')
+        return '角色知识只参与读取，不参与 stable 写回。'
+      if (params.entry.kind === 'follow-ups')
+        return '只有明确动作型 follow-up 才会进入 stable。'
+      return '该候选目前不满足 stable 写回条件。'
+    }
+
+    if (params.status === 'conflicted') {
+      if (params.persistedStructuredConflict) {
+        return '该候选与已落盘的 stable memory 在同一 structured key 上冲突，先进入 conflicted 等待人工复核。'
+      }
+
+      return '该候选与同类已记录候选存在冲突，需要人工确认后再写回。'
+    }
+
+    if (params.status === 'tentative')
+      return '该候选仍需至少两轮一致观察后才会进入 stable。'
+
+    if (params.entry.kind === 'follow-ups')
+      return '动作型 follow-up 可直接进入 stable。'
+
+    if (params.entry.strongSignal)
+      return '该表达具有强稳定性，可单轮进入 stable。'
+
+    return '该候选已满足 stable 条件，可供后续写回流程使用。'
+  }
+  function buildCandidateSummary(status: ExternalMemoryCandidateStatus, kind: ExternalMemoryCandidateKind) {
+    const kindLabel = {
+      'user-profile': '用户信息',
+      'preferences': '偏好设置',
+      'follow-ups': '待跟进',
+      'recent-summary': '近期摘要',
+      'character-knowledge': '角色知识',
+    } satisfies Record<ExternalMemoryCandidateKind, string>
+
+    return `${kindLabel[kind]}候选当前状态为：${status}。`
+  }
+
+  async function buildJudgementSnapshotFromLedger(ledger: ExternalMemoryCandidateLedgerFile): Promise<ExternalMemoryJudgementSnapshot> {
+    const statusCounts: Record<ExternalMemoryCandidateStatus, number> = {
+      tentative: 0,
+      stable: 0,
+      conflicted: 0,
+      suppressed: 0,
+    }
+    const conflicts: ExternalMemoryConflictSnapshot[] = []
+    const recommendationsByKind = new Map<ExternalMemoryCandidateKind, ExternalMemoryCandidateSnapshot[]>()
+    const resolvedRoot = await resolveMemoryRoot()
+    const persistedContext = await buildPersistedMemoryRecommendationContext(resolvedRoot.rootPath)
+
+    const candidates = ledger.candidates.map((entry): ExternalMemoryCandidateSnapshot => {
+      const structuredKey = entry.structuredKey ?? extractStructuredKey(entry.text)
+      const conflictingEntries = structuredKey
+        ? ledger.candidates.filter(candidate => candidate !== entry
+          && candidate.kind === entry.kind
+          && (candidate.structuredKey ?? extractStructuredKey(candidate.text)) === structuredKey
+          && candidate.normalizedText !== entry.normalizedText)
+        : []
+      const persistedStructuredConflict = (entry.kind === 'user-profile' || entry.kind === 'preferences') && structuredKey
+        ? persistedContext.existingStructuredKeyByKind.get(entry.kind)?.get(structuredKey)
+        : undefined
+      const persistedNormalizedMatch = persistedContext.existingNormalizedByKind.get(entry.kind)?.get(entry.normalizedText)
+      const status = deriveCandidateStatus({
+        entry,
+        conflictingEntries,
+        persistedStructuredConflict: persistedStructuredConflict?.normalized !== entry.normalizedText
+          ? persistedStructuredConflict
+          : undefined,
+      })
+      const reason = buildCandidateReason({
+        entry,
+        status,
+        conflictingEntries,
+        persistedStructuredConflict: persistedStructuredConflict?.normalized !== entry.normalizedText
+          ? persistedStructuredConflict
+          : undefined,
+      })
+      const snapshot: ExternalMemoryCandidateSnapshot = {
+        id: `${entry.kind}:${entry.normalizedText}`,
+        kind: entry.kind,
+        source: entry.source,
+        status,
+        text: entry.text,
+        normalizedText: entry.normalizedText,
+        summary: buildCandidateSummary(status, entry.kind),
+        reason,
+        firstObservedAt: entry.firstObservedAt,
+        lastObservedAt: entry.lastObservedAt,
+        observationCount: entry.observationCount,
+        strongSignal: entry.strongSignal,
+      }
+
+      statusCounts[status] += 1
+
+      if (status === 'conflicted') {
+        for (const conflictingEntry of conflictingEntries) {
+          conflicts.push({
+            id: `${snapshot.id}:conflict:${conflictingEntry.normalizedText}`,
+            kind: entry.kind,
+            candidateId: snapshot.id,
+            structuredKey,
+            existingText: conflictingEntry.text,
+            incomingText: entry.text,
+            summary: '候选内容存在冲突。',
+            reason,
+          })
+        }
+
+        if (persistedStructuredConflict && persistedStructuredConflict.normalized !== entry.normalizedText) {
+          conflicts.push({
+            id: `${snapshot.id}:persisted-conflict`,
+            kind: entry.kind,
+            candidateId: snapshot.id,
+            structuredKey,
+            existingText: persistedStructuredConflict.original,
+            incomingText: entry.text,
+            summary: '新候选与已落盘的 stable memory 存在冲突。',
+            reason,
+          })
+        }
+      }
+
+      if (status === 'stable'
+        && entry.kind !== 'recent-summary'
+        && entry.kind !== 'character-knowledge'
+        && !persistedNormalizedMatch) {
+        const current = recommendationsByKind.get(entry.kind) ?? []
+        current.push(snapshot)
+        recommendationsByKind.set(entry.kind, current)
+      }
+
+      return snapshot
+    })
+
+    const recommendations: ExternalMemoryWriteRecommendation[] = Array.from(recommendationsByKind.entries()).map(([kind, stableCandidates]) => {
+      return {
+        kind,
+        candidateIds: stableCandidates.map(candidate => candidate.id),
+        addItems: stableCandidates.map(candidate => candidate.text),
+        summary: `${stableCandidates.length} 条 stable ${kind} 候选已可进入后续写回流程。`,
+        reason: kind === 'follow-ups'
+          ? '动作型待跟进候选可直接进入 stable。'
+          : '这些候选已经满足 stable 规则，但实际写回仍取决于后续流程。',
+      }
+    })
+
+    const snapshot: ExternalMemoryJudgementSnapshot = {
+      ...createDefaultExternalMemoryJudgementSnapshot(),
+      refreshedAt: Date.now(),
+      candidateLedgerPath,
+      summary: `当前候选账本共跟踪 ${candidates.length} 条候选，其中 ${statusCounts.stable} 条为 stable。`,
+      reason: '这是第九阶段的候选稳定化快照，供渲染层与后续运行时任务读取。',
+      statusCounts,
+      candidates,
+      conflicts,
+      recommendations,
+    }
+
+    return snapshot
+  }
+
+  async function refreshMemoryJudgement() {
+    const snapshot = await buildJudgementSnapshotFromLedger(await readCandidateLedgerFile())
+    updateUsage({
+      judgement: snapshot,
+    })
+    return snapshot
+  }
+
+  async function getMemoryJudgementSnapshot() {
+    if (lastUsage.judgement?.refreshedAt)
+      return lastUsage.judgement
+
+    return await refreshMemoryJudgement()
+  }
+
+  async function clearMemoryCandidateLedger() {
+    const ledger: ExternalMemoryCandidateLedgerFile = {
+      version: 1,
+      candidates: [],
+    }
+    await writeCandidateLedgerFile(ledger)
+    const snapshot = await buildJudgementSnapshotFromLedger(ledger)
+    updateUsage({
+      judgement: snapshot,
+    })
+    return snapshot
+  }
+
+  async function recordMemoryObservation(request: ExternalMemoryObservationRecord) {
+    const normalizedText = normalizeComparisonText(request.text)
+    const observedAt = request.observedAt ?? Date.now()
+    const ledger = await readCandidateLedgerFile()
+
+    if (normalizedText) {
+      const existingEntry = ledger.candidates.find(candidate => candidate.kind === request.kind && candidate.normalizedText === normalizedText)
+      if (existingEntry) {
+        existingEntry.text = request.text
+        existingEntry.source = request.source
+        existingEntry.characterName = request.characterName ?? existingEntry.characterName
+        existingEntry.lastObservedAt = observedAt
+        existingEntry.structuredKey = existingEntry.structuredKey ?? extractStructuredKey(request.text)
+        if (existingEntry.lastCountedObservedAt !== observedAt) {
+          existingEntry.observationCount += 1
+          existingEntry.lastCountedObservedAt = observedAt
+        }
+        existingEntry.strongSignal = existingEntry.strongSignal || isStrongStableObservation(request, normalizedText)
+        existingEntry.actionable = existingEntry.actionable || request.actionable === true || actionableFollowUpPattern.test(normalizedText)
+      }
+      else {
+        ledger.candidates.push({
+          kind: request.kind,
+          source: request.source,
+          text: request.text,
+          normalizedText,
+          structuredKey: extractStructuredKey(request.text),
+          characterName: request.characterName,
+          firstObservedAt: observedAt,
+          lastObservedAt: observedAt,
+          observationCount: 1,
+          strongSignal: isStrongStableObservation(request, normalizedText),
+          actionable: request.actionable === true || actionableFollowUpPattern.test(normalizedText),
+          lastCountedObservedAt: observedAt,
+        })
+      }
+    }
+
+    await writeCandidateLedgerFile(ledger)
+    return await refreshMemoryJudgement()
   }
 
   function getMemoryIntegrationSnapshot() {
@@ -949,14 +1330,14 @@ export function createExternalMemoryManager(params: {
       if (!rootStat.isDirectory()) {
         return {
           state: 'degraded',
-          summary: '记忆根目录路径不是文件夹。',
+          summary: '记忆根路径不是目录。',
         }
       }
     }
     catch {
       return {
         state: 'degraded',
-        summary: '记忆根目录路径不可用。',
+        summary: '记忆根路径不可用。',
       }
     }
 
@@ -1009,8 +1390,8 @@ export function createExternalMemoryManager(params: {
 
     const readAt = Date.now()
     const preliminarySummary = documents.some(document => document.items.length > 0)
-      ? `已从 ${documents.filter(document => document.items.length > 0).length} 组文档加载可信记忆。`
-      : '记忆根目录可访问，但未找到可用的记忆片段。'
+      ? `已从 ${documents.filter(document => document.items.length > 0).length} 份文档加载可信记忆。`
+      : '记忆根路径可访问，但没有找到可用的记忆片段。'
     const turn = buildTurnSnapshot({
       readAt,
       characterName,
@@ -1022,8 +1403,8 @@ export function createExternalMemoryManager(params: {
     const usedKinds = Array.from(new Set(turn.evidence.filter(item => item.selected).map(item => item.kind)))
     const usedLayers = [...turn.usedLayers]
     const summary = usedKinds.length > 0
-      ? `已从 ${usedKinds.length} 组选中文档加载可信记忆。`
-      : '记忆根目录可访问，但所有记忆候选都被分层规则压制了。'
+      ? `已从 ${usedKinds.length} 组已选中文档加载可信记忆。`
+      : '记忆根路径可访问，但所有候选都被分层规则压制了。'
     const normalizedTurn: ExternalMemoryTurnSnapshot = {
       ...turn,
       summary,
@@ -1090,7 +1471,7 @@ export function createExternalMemoryManager(params: {
       let selected = false
       let decision = createCandidateDecision({
         type: 'suppressed-empty',
-        detail: '已压制：该记忆候选没有有意义的规范化内容。',
+        detail: '已压制：这条记忆候选在归一化后没有有意义的内容。',
       })
       let occurrenceCount = 0
       let matchedExistingText: string | undefined
@@ -1098,13 +1479,13 @@ export function createExternalMemoryManager(params: {
       if (!normalizedText) {
         decision = createCandidateDecision({
           type: 'suppressed-empty',
-          detail: '已压制：该记忆候选没有有意义的规范化内容。',
+          detail: '已压制：这条记忆候选在归一化后没有有意义的内容。',
         })
       }
       else if (seenNormalized.has(normalizedText)) {
         decision = createCandidateDecision({
           type: 'suppressed-duplicate',
-          detail: '已压制：这一批次中已经出现了等价的记忆候选。',
+          detail: '已压制：这一批中已经包含等价的记忆候选。',
         })
       }
       else {
@@ -1117,7 +1498,7 @@ export function createExternalMemoryManager(params: {
         if (duplicate) {
           decision = createCandidateDecision({
             type: 'suppressed-duplicate',
-            detail: '已压制：稳定记忆中已经存在等价内容。',
+            detail: '已压制：stable memory 中已存在等价内容。',
           })
           matchedExistingText = duplicate.original
         }
@@ -1130,21 +1511,21 @@ export function createExternalMemoryManager(params: {
         else if (conflictingItem && conflictingItem.normalized !== normalizedText) {
           decision = createCandidateDecision({
             type: 'suppressed-conflict',
-            detail: '已压制：更强的既有稳定记忆已经记录了冲突的规范化事实。',
+            detail: '已压制：现有 stable memory 已记录了相互冲突的结构化事实。',
           })
           matchedExistingText = conflictingItem.original
         }
         else if (isWeakStableSignal(item) && occurrenceCount < 2) {
           decision = createCandidateDecision({
             type: 'suppressed-needs-repeat',
-            detail: '已压制：较弱的稳定信号至少需要重复出现两次后才会自动写回。',
+            detail: '已压制：较弱的稳定信号至少要在两次观察中重复出现后才能写回。',
           })
         }
         else {
           selected = true
           decision = createCandidateDecision({
             type: 'selected',
-            detail: '已选中：该记忆候选已通过规范化、重复出现与冲突检查，可写回稳定记忆。',
+            detail: '已选中：这条 stable-memory 候选已通过归一化、去重和冲突检查。',
           })
           selectedAddItems.push(item)
         }
@@ -1172,11 +1553,11 @@ export function createExternalMemoryManager(params: {
       reason: selectedAddItems.length > 0
         ? createCandidateReason({
             code: 'write-written',
-            detail: '至少有一条稳定记忆候选被选中并准备落盘。',
+            detail: '至少有一条 stable-memory 候选被选中并已准备写入。',
           })
         : decisions[0]?.reason ?? createCandidateReason({
           code: 'write-skipped-empty',
-          detail: '规范化后没有留下可写回的稳定记忆候选。',
+          detail: '归一化后没有保留下可写入的 stable-memory 候选。',
         }),
       addItems: selectedAddItems,
       removeItems: [],
@@ -1208,26 +1589,26 @@ export function createExternalMemoryManager(params: {
       let selected = false
       let decision = createCandidateDecision({
         type: 'suppressed-empty',
-        detail: '已压制：该待跟进候选没有有意义的规范化内容。',
+        detail: '已压制：这条待跟进候选在归一化后没有有意义的内容。',
       })
       let matchedExistingText: string | undefined
 
       if (!normalizedText) {
         decision = createCandidateDecision({
           type: 'suppressed-empty',
-          detail: '已压制：该待跟进候选没有有意义的规范化内容。',
+          detail: '已压制：这条待跟进候选在归一化后没有有意义的内容。',
         })
       }
       else if (seenAdds.has(normalizedText)) {
         decision = createCandidateDecision({
           type: 'suppressed-duplicate',
-          detail: '已压制：这一批次中已经出现了等价的待跟进候选。',
+          detail: '已压制：这一批中已经包含等价的待跟进候选。',
         })
       }
       else if (!isActionableFollowUpLine(item)) {
         decision = createCandidateDecision({
           type: 'suppressed-not-actionable',
-          detail: '已压制：待跟进记忆只接受明确的动作或提醒内容。',
+          detail: '已压制：待跟进记忆只接收明确动作或提醒事项。',
         })
       }
       else if (existingMap.has(normalizedText)) {
@@ -1242,7 +1623,7 @@ export function createExternalMemoryManager(params: {
         selected = true
         decision = createCandidateDecision({
           type: 'selected',
-          detail: '已选中：该候选是明确的动作型待跟进。',
+          detail: '已选中：这条候选是明确可执行的待跟进事项。',
         })
         selectedAddItems.push(item)
       }
@@ -1266,25 +1647,25 @@ export function createExternalMemoryManager(params: {
       let selected = false
       let decision = createCandidateDecision({
         type: 'suppressed-empty',
-        detail: '已压制：该待跟进移除候选没有有意义的规范化内容。',
+        detail: '已压制：这条待移除的待跟进候选在归一化后没有有意义的内容。',
       })
 
       if (!normalizedText) {
         decision = createCandidateDecision({
           type: 'suppressed-empty',
-          detail: '已压制：该待跟进移除候选没有有意义的规范化内容。',
+          detail: '已压制：这条待移除的待跟进候选在归一化后没有有意义的内容。',
         })
       }
       else if (seenRemovals.has(normalizedText)) {
         decision = createCandidateDecision({
           type: 'suppressed-duplicate',
-          detail: '已压制：这一批次中已经出现了等价的待跟进移除候选。',
+          detail: '已压制：这一批中已经包含等价的待跟进移除候选。',
         })
       }
       else if (!existing) {
         decision = createCandidateDecision({
           type: 'removal-suppressed-missing',
-          detail: '已压制：没有找到可移除的匹配待跟进条目。',
+          detail: '已压制：没有找到可移除的匹配待跟进项。',
         })
       }
       else {
@@ -1292,7 +1673,7 @@ export function createExternalMemoryManager(params: {
         selected = true
         decision = createCandidateDecision({
           type: 'removal-selected',
-          detail: '已选中：已找到匹配的待跟进条目，可执行移除。',
+          detail: '已选中：已找到匹配的待跟进项，可以移除。',
         })
         selectedRemoveItems.push(item)
         removedOriginalItems.push(existing.original)
@@ -1320,11 +1701,11 @@ export function createExternalMemoryManager(params: {
       reason: selectedAddItems.length > 0 || selectedRemoveItems.length > 0
         ? createCandidateReason({
             code: 'write-written',
-            detail: '至少有一条待跟进新增或移除候选被选中并准备落盘。',
+            detail: '至少有一条待跟进新增或移除候选被选中并已准备写入。',
           })
         : decisions[0]?.reason ?? createCandidateReason({
           code: 'write-skipped-empty',
-          detail: '评审后没有留下可写回的待跟进候选。',
+          detail: '评审后没有保留下可写入的待跟进候选。',
         }),
       addItems: selectedAddItems,
       removeItems: selectedRemoveItems,
@@ -1356,26 +1737,26 @@ export function createExternalMemoryManager(params: {
       let selected = false
       let decision = createCandidateDecision({
         type: 'suppressed-empty',
-        detail: '已压制：该近期摘要正文行没有有意义的规范化内容。',
+        detail: '已压制：这条近期摘要在归一化后没有有意义的内容。',
       })
 
       if (!normalizedText) {
         decision = createCandidateDecision({
           type: 'suppressed-empty',
-          detail: '已压制：该近期摘要正文行没有有意义的规范化内容。',
+          detail: '已压制：这条近期摘要在归一化后没有有意义的内容。',
         })
       }
       else if (seenNormalized.has(normalizedText)) {
         decision = createCandidateDecision({
           type: 'suppressed-duplicate',
-          detail: '已压制：这一批次中已经出现了等价的正文行。',
+          detail: '已压制：这一批中已经包含等价的近期摘要内容。',
         })
       }
       else if (previousMap.has(normalizedText)) {
         seenNormalized.add(normalizedText)
         decision = createCandidateDecision({
           type: 'suppressed-no-new-content',
-          detail: '已压制：已存储的近期摘要正文中已经包含相同的实质内容。',
+          detail: '已压制：已存储的近期摘要已经包含相同的有效内容。',
         })
       }
       else {
@@ -1383,7 +1764,7 @@ export function createExternalMemoryManager(params: {
         selected = true
         decision = createCandidateDecision({
           type: 'selected',
-          detail: '已选中：这一正文行补充了新的近期摘要实质内容。',
+          detail: '已选中：这条内容补充了新的有效近期摘要。',
         })
         hasNewBodyContent = true
       }
@@ -1409,11 +1790,11 @@ export function createExternalMemoryManager(params: {
       reason: hasNewBodyContent
         ? createCandidateReason({
             code: 'write-written',
-            detail: '近期摘要评审发现了可写回的新增实质内容。',
+            detail: '近期摘要评审发现了可写回的新有效内容。',
           })
         : decisions[0]?.reason ?? createCandidateReason({
           code: 'write-skipped-empty',
-          detail: '近期摘要评审没有发现新的实质内容。',
+          detail: '近期摘要评审没有发现新的有效内容。',
         }),
       addItems: decisions.filter(item => item.selected && item.action === 'add').map(item => item.text),
       removeItems: [],
@@ -1452,7 +1833,7 @@ export function createExternalMemoryManager(params: {
         changed: false,
         decision: 'skipped-unavailable',
         reason: review.reason,
-        summary: '近期摘要写回已跳过：记忆根目录不可用。',
+        summary: '近期摘要写回已跳过，因为记忆根路径不可用。',
         writtenAt,
         error: resolvedRoot.summary,
         review,
@@ -1475,7 +1856,7 @@ export function createExternalMemoryManager(params: {
         changed: false,
         decision: 'skipped-empty',
         reason: review.reason,
-        summary: '近期摘要写回已跳过：没有提供可用的摘要正文。',
+        summary: '近期摘要写回已跳过，因为没有提供可用的摘要正文。',
         writtenAt,
         path,
         review,
@@ -1498,7 +1879,7 @@ export function createExternalMemoryManager(params: {
         changed: false,
         decision: 'skipped-duplicate',
         reason: review.reason,
-        summary: '近期摘要已覆盖相同正文内容，因此无需写回。',
+        summary: '近期摘要已包含相同正文内容，因此无需写回。',
         writtenAt,
         path,
         review,
@@ -1521,7 +1902,7 @@ export function createExternalMemoryManager(params: {
       changed: true,
       decision: 'written',
       reason: review.reason,
-      summary: '近期摘要已更新为新的正文内容。',
+      summary: '近期摘要已用新的正文内容完成更新。',
       writtenAt,
       path,
       added: reviewed.candidate.addItems,
@@ -1557,7 +1938,7 @@ export function createExternalMemoryManager(params: {
         changed: false,
         decision: 'skipped-unavailable',
         reason: review.reason,
-        summary: '待跟进写回已跳过：记忆根目录不可用。',
+        summary: '待跟进写回已跳过，因为记忆根路径不可用。',
         writtenAt,
         error: resolvedRoot.summary,
         review,
@@ -1582,8 +1963,8 @@ export function createExternalMemoryManager(params: {
         decision,
         reason: review.reason,
         summary: decision === 'skipped-duplicate'
-          ? '待跟进条目已与存储列表一致。'
-          : '待跟进写回已跳过：评审后没有留下可执行的变更。',
+          ? '待跟进项目已与已存储列表一致。'
+          : '待跟进写回已跳过，因为评审后没有留下可执行的变更。',
         writtenAt,
         path,
         review,
@@ -1609,7 +1990,7 @@ export function createExternalMemoryManager(params: {
       changed: merged.changed,
       decision: review.decision,
       reason: review.reason,
-      summary: merged.changed ? '待跟进条目已更新。' : '评审后无需更新待跟进条目。',
+      summary: merged.changed ? '待跟进项目已更新。' : '评审后无需更新待跟进项目。',
       writtenAt,
       path,
       added: reviewed.selectedAddItems,
@@ -1646,7 +2027,7 @@ export function createExternalMemoryManager(params: {
         changed: false,
         decision: 'skipped-unavailable',
         reason: review.reason,
-        summary: '用户信息写回已跳过：记忆根目录不可用。',
+        summary: '用户信息写回已跳过，因为记忆根路径不可用。',
         writtenAt,
         error: resolvedRoot.summary,
         review,
@@ -1672,7 +2053,7 @@ export function createExternalMemoryManager(params: {
         reason: review.reason,
         summary: decision === 'skipped-duplicate'
           ? '未检测到新的用户信息事实。'
-          : '用户信息写回已跳过：评审后的事实还不够稳定。',
+          : '用户信息写回已跳过，因为评审后的事实还不够稳定。',
         writtenAt,
         path,
         review,
@@ -1734,7 +2115,7 @@ export function createExternalMemoryManager(params: {
         changed: false,
         decision: 'skipped-unavailable',
         reason: review.reason,
-        summary: '偏好设置写回已跳过：记忆根目录不可用。',
+        summary: '偏好设置写回已跳过，因为记忆根路径不可用。',
         writtenAt,
         error: resolvedRoot.summary,
         review,
@@ -1759,8 +2140,8 @@ export function createExternalMemoryManager(params: {
         decision,
         reason: review.reason,
         summary: decision === 'skipped-duplicate'
-          ? '未检测到新的偏好设置。'
-          : '偏好设置写回已跳过：评审后的偏好还不够稳定。',
+          ? '未检测到新的偏好。'
+          : '偏好设置写回已跳过，因为评审后的偏好还不够稳定。',
         writtenAt,
         path,
         review,
@@ -1786,7 +2167,7 @@ export function createExternalMemoryManager(params: {
       changed: merged.changed,
       decision: review.decision,
       reason: review.reason,
-      summary: merged.changed ? '偏好设置已更新。' : '未检测到新的偏好设置。',
+      summary: merged.changed ? '偏好设置已更新。' : '未检测到新的偏好。',
       writtenAt,
       path,
       added: reviewed.selectedAddItems,
@@ -1797,9 +2178,13 @@ export function createExternalMemoryManager(params: {
   }
 
   return {
+    clearMemoryCandidateLedger,
     clearMemoryWriteCandidateHistory,
     getLastMemoryUsage: () => lastUsage,
+    getMemoryJudgementSnapshot,
     loadMemoryContext,
+    recordMemoryObservation,
+    refreshMemoryJudgement,
     refreshMemoryContext,
     writeFollowUpItems,
     writePreferencesPatch,
@@ -1822,6 +2207,22 @@ export function createExternalMemoryService(params: {
 
   defineInvokeHandler(params.context, electronExternalMemoryGetLastUsage, async () => {
     return params.manager.getLastMemoryUsage()
+  })
+
+  defineInvokeHandler(params.context, electronExternalMemoryRecordMemoryObservation, async (request) => {
+    return await params.manager.recordMemoryObservation(request)
+  })
+
+  defineInvokeHandler(params.context, electronExternalMemoryRefreshMemoryJudgement, async () => {
+    return await params.manager.refreshMemoryJudgement()
+  })
+
+  defineInvokeHandler(params.context, electronExternalMemoryGetMemoryJudgementSnapshot, async () => {
+    return await params.manager.getMemoryJudgementSnapshot()
+  })
+
+  defineInvokeHandler(params.context, electronExternalMemoryClearMemoryCandidateLedger, async () => {
+    return await params.manager.clearMemoryCandidateLedger()
   })
 
   defineInvokeHandler(params.context, electronExternalMemoryClearWriteCandidateHistory, async () => {

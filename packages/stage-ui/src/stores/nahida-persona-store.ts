@@ -4,6 +4,8 @@ import { errorMessageFrom } from '@moeru/std'
 import { defineStore } from 'pinia'
 import { computed, ref, toRaw } from 'vue'
 
+import { composeTrustedMemoryGuardrails } from './external-memory'
+import { useExternalMemoryStore } from './external-memory-store'
 import { useAiriCardStore } from './modules/airi-card'
 import {
   composeNahidaPersonaSnapshot,
@@ -31,6 +33,7 @@ export interface NahidaPersonaBridge {
 export const useNahidaPersonaStore = defineStore('nahida-persona', () => {
   const cardStore = useAiriCardStore()
   const stageModelStore = useSettingsStageModel()
+  const externalMemoryStore = useExternalMemoryStore()
   const bridge = ref<NahidaPersonaBridge>()
   const settings = ref<NahidaPersonaSettings>(createDefaultNahidaPersonaSettings())
   const loading = ref(false)
@@ -50,6 +53,10 @@ export const useNahidaPersonaStore = defineStore('nahida-persona', () => {
     card: cardStore.activeCard,
     displayModelName: activeDisplayModelName.value,
     settings: settings.value,
+    trustedMemoryGuardrails: composeTrustedMemoryGuardrails({
+      judgement: externalMemoryStore.judgementSnapshot,
+      turn: externalMemoryStore.turnSnapshot,
+    }),
   }))
   const activeModeSummary = computed(() => activeModeBehavior.value.summary)
   const displayModeLabel = computed(() => getNahidaPersonaModeDisplayLabel(settings.value.mode))

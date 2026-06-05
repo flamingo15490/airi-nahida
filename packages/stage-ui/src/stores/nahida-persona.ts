@@ -398,6 +398,7 @@ export function composeNahidaPersonaSupplement(params: {
   card: Pick<AiriCard, 'name'> | undefined
   displayModelName?: string | undefined
   settings?: Partial<NahidaPersonaSettings> | undefined
+  trustedMemoryGuardrails?: string[] | undefined
 }) {
   const cardName = params.card?.name?.trim()
   if (!isNahidaPersonaTarget({
@@ -417,6 +418,7 @@ export function composeNahidaPersonaSupplement(params: {
   }
 
   const behavior = getNahidaPersonaModeBehavior(settings.mode)
+  const trustedMemoryGuardrails = params.trustedMemoryGuardrails?.filter(Boolean) ?? []
 
   return [
     '[Nahida Persona Supplement]',
@@ -436,6 +438,7 @@ export function composeNahidaPersonaSupplement(params: {
       behavior.summary,
       ...behavior.continuity,
       ...behavior.initiative,
+      ...trustedMemoryGuardrails,
     ]),
     '',
     quoteSection('Taboos:', [

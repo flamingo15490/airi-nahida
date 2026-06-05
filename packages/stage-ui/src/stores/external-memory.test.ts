@@ -5,9 +5,11 @@ import { setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
+  collectTrustedTurnEvidence,
   composeExternalMemorySupplement,
 } from './external-memory'
 import {
+  createDefaultExternalMemoryJudgementSnapshot,
   createDefaultExternalMemoryTurnSnapshot,
   createDefaultExternalMemoryUsageSnapshot,
   createDefaultExternalMemoryWriteReviewSnapshot,
@@ -43,6 +45,15 @@ function createContextSnapshot(): ExternalMemoryContextSnapshot {
       readAt: 1,
       usedLayers: ['stable-profile', 'stable-preferences'],
       summary: 'Loaded.',
+      citations: [{
+        id: 'citation-1',
+        evidenceId: 'evidence-1',
+        layer: 'stable-profile',
+        kind: 'user-profile',
+        priority: 0,
+        title: 'Stable profile note',
+        excerpt: 'The user studies finance and computing.',
+      }],
     },
     sections: {
       userProfile: ['The user studies finance and computing.'],
@@ -83,11 +94,93 @@ describe('external memory supplement', () => {
     })
 
     expect(supplement).toContain('[External Memory Context]')
+    expect(supplement).toContain('Only stable external memory and trusted turn evidence may be referenced as remembered context.')
     expect(supplement).toContain('Stable user profile:')
     expect(supplement).toContain('Known preferences and boundaries:')
     expect(supplement).toContain('Open follow-ups:')
-    expect(supplement).toContain('Recent continuity:')
-    expect(supplement).toContain('higher-confidence memory')
+    expect(supplement).toContain('Trusted turn evidence:')
+    expect(supplement).not.toContain('Recent continuity:')
+  })
+
+  it('does not surface tentative candidates as confirmed remembered memory', () => {
+    const supplement = composeExternalMemorySupplement({
+      usage: {
+        ...createDefaultExternalMemoryUsageSnapshot(),
+        bridgeState: 'ready',
+        reason: createExternalMemoryReasonSnapshot('bridge-ready'),
+        summary: 'ready',
+        judgement: {
+          ...createDefaultExternalMemoryJudgementSnapshot(),
+          summary: '1 tentative candidate is still under review.',
+          reason: 'The candidate has not reached the stable threshold yet.',
+          statusCounts: {
+            tentative: 1,
+            stable: 0,
+            conflicted: 0,
+            suppressed: 0,
+          },
+          candidates: [{
+            id: 'candidate-1',
+            kind: 'preferences',
+            source: 'user-turn-preferences',
+            status: 'tentative',
+            text: 'The user prefers playful replies.',
+            normalizedText: 'the user prefers playful replies.',
+            summary: 'Tentative preference candidate.',
+            reason: 'Still waiting for another consistent observation.',
+            firstObservedAt: 1,
+            lastObservedAt: 2,
+            observationCount: 1,
+            strongSignal: false,
+          }],
+        },
+        turn: {
+          ...createDefaultExternalMemoryTurnSnapshot(),
+          readAt: 3,
+          citations: [{
+            id: 'citation-1',
+            evidenceId: 'evidence-1',
+            layer: 'recent-context',
+            kind: 'recent-summary',
+            priority: 3,
+            title: 'Recent turn recap',
+            excerpt: 'The user is continuing phase nine work today.',
+          }],
+        },
+      },
+    })
+
+    expect(supplement).toContain('[External Memory Context]')
+    expect(supplement).toContain('Trusted turn evidence:')
+    expect(supplement).toContain('Do not describe tentative or conflicted candidates as remembered facts')
+    expect(supplement).not.toContain('The user prefers playful replies.')
+  })
+})
+
+describe('trusted turn evidence', () => {
+  it('prefers citations over raw evidence when both are available', () => {
+    expect(collectTrustedTurnEvidence({
+      ...createDefaultExternalMemoryTurnSnapshot(),
+      citations: [{
+        id: 'citation-1',
+        evidenceId: 'evidence-1',
+        layer: 'recent-context',
+        kind: 'recent-summary',
+        priority: 3,
+        title: 'Recent recap',
+        excerpt: 'Trusted cited recap.',
+      }],
+      evidence: [{
+        id: 'evidence-1',
+        layer: 'recent-context',
+        kind: 'recent-summary',
+        priority: 3,
+        title: 'Recent recap',
+        itemIndex: 0,
+        text: 'Fallback evidence line.',
+        selected: true,
+      }],
+    })).toEqual(['Trusted cited recap.'])
   })
 })
 
@@ -141,6 +234,10 @@ describe('external memory store', () => {
       loadMemoryContext: async () => runtimeContext,
       refreshMemoryContext: async () => runtimeContext,
       getLastMemoryUsage: async () => runtimeUsage,
+      recordMemoryObservation: vi.fn(async () => createDefaultExternalMemoryJudgementSnapshot()),
+      refreshMemoryJudgement: vi.fn(async () => createDefaultExternalMemoryJudgementSnapshot()),
+      getMemoryJudgementSnapshot: vi.fn(async () => createDefaultExternalMemoryJudgementSnapshot()),
+      clearMemoryCandidateLedger: vi.fn(async () => createDefaultExternalMemoryJudgementSnapshot()),
       clearMemoryWriteCandidateHistory: vi.fn(),
       writeFollowUpItems: vi.fn(),
       writePreferencesPatch: vi.fn(),
@@ -206,6 +303,10 @@ describe('external memory store', () => {
       loadMemoryContext: async () => createContextSnapshot(),
       refreshMemoryContext: async () => createContextSnapshot(),
       getLastMemoryUsage: async () => runtimeUsage,
+      recordMemoryObservation: vi.fn(async () => createDefaultExternalMemoryJudgementSnapshot()),
+      refreshMemoryJudgement: vi.fn(async () => createDefaultExternalMemoryJudgementSnapshot()),
+      getMemoryJudgementSnapshot: vi.fn(async () => createDefaultExternalMemoryJudgementSnapshot()),
+      clearMemoryCandidateLedger: vi.fn(async () => createDefaultExternalMemoryJudgementSnapshot()),
       clearMemoryWriteCandidateHistory,
       writeFollowUpItems: vi.fn(),
       writePreferencesPatch: vi.fn(),

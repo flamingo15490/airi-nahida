@@ -105,6 +105,24 @@ describe('nahida persona supplement', () => {
     expect(supplement).toContain('Do not turn every reply into a lesson; sometimes simple companionship is the right tone.')
   })
 
+  it('keeps conflicted memory behind explicit guardrails instead of treating it as remembered fact', () => {
+    const supplement = composeNahidaPersonaSupplement({
+      card: { name: 'Nahida' },
+      settings: {
+        enabled: true,
+        mode: 'balanced',
+      },
+      trustedMemoryGuardrails: [
+        'Only stable external memory and trusted turn evidence may be referenced as remembered context.',
+        'Do not describe tentative or conflicted candidates as remembered facts, confirmed preferences, or established long-term memory.',
+      ],
+    })
+
+    expect(supplement).toContain('Only stable external memory and trusted turn evidence may be referenced as remembered context.')
+    expect(supplement).toContain('Do not describe tentative or conflicted candidates as remembered facts')
+    expect(supplement).not.toContain('confirmed long-term memory')
+  })
+
   it('adds one shared proactive tone block without forcing dreamy tics into every reply', () => {
     const supplement = composeNahidaPersonaSupplement({
       card: { name: 'Nahida' },

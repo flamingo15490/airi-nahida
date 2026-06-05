@@ -8,6 +8,8 @@ import {
 } from '@proj-airi/stage-ui/stores/nahida-persona-shared'
 import { createDefaultProactiveCompanionRuntimeSnapshot } from '@proj-airi/stage-ui/stores/proactive-companion-shared'
 
+import { hasConflictedMemoryCandidates, hasRecentStableCandidateWriteback } from './external-memory'
+
 export const COMPANION_COORDINATION_SURFACES = [
   'memory',
   'persona',
@@ -204,6 +206,27 @@ function countMemorySectionItems(memoryUsage: ExternalMemoryUsageSnapshot) {
   }, 0)
 }
 
+function appendMemoryStatusNotes(baseText: string, params: {
+  hasConflicts: boolean
+  hasRecentStableWriteback: boolean
+}) {
+  const notes: string[] = []
+
+  if (params.hasConflicts) {
+    notes.push('当前仍有 conflicted candidate 待处理。')
+  }
+
+  if (params.hasRecentStableWriteback) {
+    notes.push('最近已有 stable candidate 写回。')
+  }
+
+  if (notes.length === 0) {
+    return baseText
+  }
+
+  return `${baseText} ${notes.join(' ')}`
+}
+
 function composeMemoryWriteActivity(memoryUsage: ExternalMemoryUsageSnapshot) {
   const latestWrite = memoryUsage.lastWrite
   if (!latestWrite) {
@@ -236,38 +259,67 @@ function composeMemoryWriteActivity(memoryUsage: ExternalMemoryUsageSnapshot) {
 
 function composeMemoryActivity(memoryUsage: ExternalMemoryUsageSnapshot) {
   const usedDocumentKindCount = memoryUsage.lastUsedDocumentKinds.length
+  const hasConflicts = hasConflictedMemoryCandidates(memoryUsage.judgement)
+  const hasRecentStableWriteback = hasRecentStableCandidateWriteback(memoryUsage)
   if (memoryUsage.context) {
     if (usedDocumentKindCount === 0) {
-      return '最近一次记忆上下文刷新完成，但没有纳入稳定内容。'
+      return appendMemoryStatusNotes('最近一次记忆上下文刷新完成，但没有纳入稳定内容。', {
+        hasConflicts,
+        hasRecentStableWriteback,
+      })
     }
 
     const stableItemCount = countMemorySectionItems(memoryUsage)
     if (stableItemCount === 0) {
-      return `最近一次记忆上下文引用了 ${usedDocumentKindCount} 类文档。`
+      return appendMemoryStatusNotes(`最近一次记忆上下文引用了 ${usedDocumentKindCount} 类文档。`, {
+        hasConflicts,
+        hasRecentStableWriteback,
+      })
     }
 
-    return `最近一次记忆上下文引用了 ${usedDocumentKindCount} 类文档，共纳入 ${stableItemCount} 条稳定记忆。`
+    return appendMemoryStatusNotes(`最近一次记忆上下文引用了 ${usedDocumentKindCount} 类文档，共纳入 ${stableItemCount} 条稳定记忆。`, {
+      hasConflicts,
+      hasRecentStableWriteback,
+    })
   }
 
-  return composeMemoryWriteActivity(memoryUsage)
+  const baseActivity = composeMemoryWriteActivity(memoryUsage)
     ?? memoryUsage.lastReadSummary
     ?? '还没有记录到记忆活动。'
+  return appendMemoryStatusNotes(baseActivity, {
+    hasConflicts,
+    hasRecentStableWriteback,
+  })
 }
 
 function composeMemoryCoverage(memoryUsage: ExternalMemoryUsageSnapshot) {
+  const hasConflicts = hasConflictedMemoryCandidates(memoryUsage.judgement)
+  const hasRecentStableWriteback = hasRecentStableCandidateWriteback(memoryUsage)
   if (memoryUsage.lastUsedDocumentKinds.length > 0) {
-    return `最近覆盖：${joinCoverage(memoryUsage.lastUsedDocumentKinds.map(formatMemoryDocumentKind))}。`
+    return appendMemoryStatusNotes(`最近覆盖：${joinCoverage(memoryUsage.lastUsedDocumentKinds.map(formatMemoryDocumentKind))}。`, {
+      hasConflicts,
+      hasRecentStableWriteback,
+    })
   }
 
   if (memoryUsage.context) {
-    return '最近覆盖：最近一次上下文里没有纳入稳定分层。'
+    return appendMemoryStatusNotes('最近覆盖：最近一次上下文里没有纳入稳定分层。', {
+      hasConflicts,
+      hasRecentStableWriteback,
+    })
   }
 
   if (memoryUsage.lastWrite) {
-    return '最近覆盖：等待最近一次写回后的上下文刷新。'
+    return appendMemoryStatusNotes('最近覆盖：等待最近一次写回后的上下文刷新。', {
+      hasConflicts,
+      hasRecentStableWriteback,
+    })
   }
 
-  return '最近覆盖：暂无记录。'
+  return appendMemoryStatusNotes('最近覆盖：暂无记录。', {
+    hasConflicts,
+    hasRecentStableWriteback,
+  })
 }
 
 function getMemoryUpdatedAt(memoryUsage: ExternalMemoryUsageSnapshot) {

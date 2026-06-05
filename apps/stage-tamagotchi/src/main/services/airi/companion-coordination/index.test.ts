@@ -5,6 +5,7 @@ import type { NahidaPersonaManager } from '../nahida-persona'
 import type { ProactiveCompanionManager } from '../proactive-companion'
 
 import {
+  createDefaultExternalMemoryJudgementSnapshot,
   createDefaultExternalMemoryTurnSnapshot,
   createDefaultExternalMemoryUsageSnapshot,
   createExternalMemoryReasonSnapshot,
@@ -71,6 +72,10 @@ function createExternalMemoryManager(): ExternalMemoryManager {
       lastUsedDocumentKinds: ['user-profile'],
       context: createMemoryContextSnapshot(),
     }),
+    recordMemoryObservation: async () => createDefaultExternalMemoryJudgementSnapshot(),
+    refreshMemoryJudgement: async () => createDefaultExternalMemoryJudgementSnapshot(),
+    getMemoryJudgementSnapshot: async () => createDefaultExternalMemoryJudgementSnapshot(),
+    clearMemoryCandidateLedger: async () => createDefaultExternalMemoryJudgementSnapshot(),
     clearMemoryWriteCandidateHistory: () => createDefaultExternalMemoryUsageSnapshot(),
     writeRecentSummary: async () => {
       throw new Error('Not used in companion coordination tests.')

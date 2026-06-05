@@ -225,6 +225,7 @@ app.whenReady().then(async () => {
     dependsOn: { externalIntegrationsManager },
     build: async ({ dependsOn }) => createExternalMemoryManager({
       externalIntegrationsManager: dependsOn.externalIntegrationsManager,
+      userDataPath: app.getPath('userData'),
     }),
   })
   const companionCoordinationManager = injeca.provide('modules:companion-coordination-manager', {

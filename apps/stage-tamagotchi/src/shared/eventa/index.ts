@@ -35,7 +35,9 @@ import type {
 } from '../external-integrations'
 import type {
   ExternalMemoryContextSnapshot,
+  ExternalMemoryJudgementSnapshot,
   ExternalMemoryLoadRequest,
+  ExternalMemoryObservationRecord,
   ExternalMemoryUsageSnapshot,
   ExternalMemoryWriteRequest,
   ExternalMemoryWriteResult,
@@ -81,6 +83,10 @@ export const electronExternalIntegrationsImportLegacyMcp = defineInvokeEventa<Ex
 export const electronExternalMemoryLoadContext = defineInvokeEventa<ExternalMemoryContextSnapshot, ExternalMemoryLoadRequest | undefined>('eventa:invoke:electron:external-memory:load-context')
 export const electronExternalMemoryRefreshContext = defineInvokeEventa<ExternalMemoryContextSnapshot, ExternalMemoryLoadRequest | undefined>('eventa:invoke:electron:external-memory:refresh-context')
 export const electronExternalMemoryGetLastUsage = defineInvokeEventa<ExternalMemoryUsageSnapshot>('eventa:invoke:electron:external-memory:get-last-usage')
+export const electronExternalMemoryRecordMemoryObservation = defineInvokeEventa<ExternalMemoryJudgementSnapshot, ExternalMemoryObservationRecord>('eventa:invoke:electron:external-memory:record-memory-observation')
+export const electronExternalMemoryRefreshMemoryJudgement = defineInvokeEventa<ExternalMemoryJudgementSnapshot>('eventa:invoke:electron:external-memory:refresh-memory-judgement')
+export const electronExternalMemoryGetMemoryJudgementSnapshot = defineInvokeEventa<ExternalMemoryJudgementSnapshot>('eventa:invoke:electron:external-memory:get-memory-judgement-snapshot')
+export const electronExternalMemoryClearMemoryCandidateLedger = defineInvokeEventa<ExternalMemoryJudgementSnapshot>('eventa:invoke:electron:external-memory:clear-memory-candidate-ledger')
 export const electronExternalMemoryClearWriteCandidateHistory = defineInvokeEventa<ExternalMemoryUsageSnapshot>('eventa:invoke:electron:external-memory:clear-write-candidate-history')
 export const electronExternalMemoryWriteRecentSummary = defineInvokeEventa<ExternalMemoryWriteResult, ExternalMemoryWriteRequest>('eventa:invoke:electron:external-memory:write-recent-summary')
 export const electronExternalMemoryWriteFollowUpItems = defineInvokeEventa<ExternalMemoryWriteResult, ExternalMemoryWriteRequest>('eventa:invoke:electron:external-memory:write-follow-up-items')

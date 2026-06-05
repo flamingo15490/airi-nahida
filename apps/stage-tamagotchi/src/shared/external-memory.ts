@@ -1,10 +1,17 @@
 import type {
+  ExternalMemoryCandidateKind as BaseExternalMemoryCandidateKind,
+  ExternalMemoryCandidateSnapshot as BaseExternalMemoryCandidateSnapshot,
+  ExternalMemoryCandidateStatus as BaseExternalMemoryCandidateStatus,
   ExternalMemoryCapabilityState as BaseExternalMemoryCapabilityState,
   ExternalMemoryCitationSnapshot as BaseExternalMemoryCitationSnapshot,
+  ExternalMemoryConflictSnapshot as BaseExternalMemoryConflictSnapshot,
   ExternalMemoryContextSnapshot as BaseExternalMemoryContextSnapshot,
   ExternalMemoryDocumentKind as BaseExternalMemoryDocumentKind,
   ExternalMemoryEvidenceSnapshot as BaseExternalMemoryEvidenceSnapshot,
+  ExternalMemoryJudgementSnapshot as BaseExternalMemoryJudgementSnapshot,
   ExternalMemoryLayerKind as BaseExternalMemoryLayerKind,
+  ExternalMemoryObservationRecord as BaseExternalMemoryObservationRecord,
+  ExternalMemoryObservationSource as BaseExternalMemoryObservationSource,
   ExternalMemoryReadSnapshot as BaseExternalMemoryReadSnapshot,
   ExternalMemoryReasonCode as BaseExternalMemoryReasonCode,
   ExternalMemoryReasonSnapshot as BaseExternalMemoryReasonSnapshot,
@@ -13,11 +20,13 @@ import type {
   ExternalMemoryUsageSnapshot as BaseExternalMemoryUsageSnapshot,
   ExternalMemoryWriteCandidate as BaseExternalMemoryWriteCandidate,
   ExternalMemoryWriteDecision as BaseExternalMemoryWriteDecision,
+  ExternalMemoryWriteRecommendation as BaseExternalMemoryWriteRecommendation,
   ExternalMemoryWriteResult as BaseExternalMemoryWriteResult,
   ExternalMemoryWriteReviewSnapshot as BaseExternalMemoryWriteReviewSnapshot,
 } from '@proj-airi/stage-ui/stores/external-memory-shared'
 
 import {
+  createDefaultExternalMemoryJudgementSnapshot as createBaseDefaultExternalMemoryJudgementSnapshot,
   createDefaultExternalMemoryTurnSnapshot as createBaseDefaultExternalMemoryTurnSnapshot,
   createDefaultExternalMemoryUsageSnapshot as createBaseDefaultExternalMemoryUsageSnapshot,
   createDefaultExternalMemoryWriteReviewSnapshot as createBaseDefaultExternalMemoryWriteReviewSnapshot,
@@ -29,8 +38,11 @@ import {
 } from '@proj-airi/stage-ui/stores/external-memory-shared'
 
 export type ExternalMemoryCapabilityState = BaseExternalMemoryCapabilityState
+export type ExternalMemoryCandidateKind = BaseExternalMemoryCandidateKind
+export type ExternalMemoryCandidateStatus = BaseExternalMemoryCandidateStatus
 export type ExternalMemoryDocumentKind = BaseExternalMemoryDocumentKind
 export type ExternalMemoryLayerKind = BaseExternalMemoryLayerKind
+export type ExternalMemoryObservationSource = BaseExternalMemoryObservationSource
 export type ExternalMemoryReasonCode = BaseExternalMemoryReasonCode
 export type ExternalMemoryWriteDecision = BaseExternalMemoryWriteDecision
 
@@ -44,6 +56,16 @@ export {
 export interface ExternalMemoryReasonSnapshot extends BaseExternalMemoryReasonSnapshot {
   detail?: string
 }
+
+export interface ExternalMemoryObservationRecord extends BaseExternalMemoryObservationRecord {}
+
+export interface ExternalMemoryConflictSnapshot extends BaseExternalMemoryConflictSnapshot {}
+
+export interface ExternalMemoryCandidateSnapshot extends BaseExternalMemoryCandidateSnapshot {}
+
+export interface ExternalMemoryWriteRecommendation extends BaseExternalMemoryWriteRecommendation {}
+
+export interface ExternalMemoryJudgementSnapshot extends BaseExternalMemoryJudgementSnapshot {}
 
 export interface ExternalMemoryEvidenceSnapshot extends BaseExternalMemoryEvidenceSnapshot {
   normalizedText?: string
@@ -127,6 +149,7 @@ export interface ExternalMemoryWriteResult extends BaseExternalMemoryWriteResult
 
 export interface ExternalMemoryUsageSnapshot extends BaseExternalMemoryUsageSnapshot {
   context?: ExternalMemoryContextSnapshot
+  judgement?: ExternalMemoryJudgementSnapshot
   turn?: ExternalMemoryTurnSnapshot
   lastWrite?: ExternalMemoryWriteResult
   lastWriteReview?: ExternalMemoryWriteReviewSnapshot
@@ -161,6 +184,10 @@ export function createDefaultExternalMemoryTurnSnapshot(): ExternalMemoryTurnSna
 
 export function createDefaultExternalMemoryWriteReviewSnapshot(): ExternalMemoryWriteReviewSnapshot {
   return createBaseDefaultExternalMemoryWriteReviewSnapshot()
+}
+
+export function createDefaultExternalMemoryJudgementSnapshot(): ExternalMemoryJudgementSnapshot {
+  return createBaseDefaultExternalMemoryJudgementSnapshot()
 }
 
 export function createDefaultExternalMemoryUsageSnapshot(): ExternalMemoryUsageSnapshot {

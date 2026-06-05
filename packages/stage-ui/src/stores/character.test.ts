@@ -11,6 +11,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { setCharacterLlmMarkerParserFactoryForTest, useCharacterStore } from './character'
 import { useCompanionCoordinationStore } from './companion-coordination-store'
 import {
+  createDefaultExternalMemoryJudgementSnapshot,
   createDefaultExternalMemoryTurnSnapshot,
   createDefaultExternalMemoryUsageSnapshot,
   createExternalMemoryReasonSnapshot,
@@ -191,6 +192,10 @@ describe('store character', () => {
       loadMemoryContext: async () => createMemoryContextSnapshot(),
       refreshMemoryContext: async () => createMemoryContextSnapshot(),
       getLastMemoryUsage: async () => createMemoryUsageSnapshot(),
+      recordMemoryObservation: vi.fn(async () => createDefaultExternalMemoryJudgementSnapshot()),
+      refreshMemoryJudgement: vi.fn(async () => createDefaultExternalMemoryJudgementSnapshot()),
+      getMemoryJudgementSnapshot: vi.fn(async () => createDefaultExternalMemoryJudgementSnapshot()),
+      clearMemoryCandidateLedger: vi.fn(async () => createDefaultExternalMemoryJudgementSnapshot()),
       clearMemoryWriteCandidateHistory: vi.fn(),
       writeFollowUpItems: vi.fn(),
       writePreferencesPatch: vi.fn(),

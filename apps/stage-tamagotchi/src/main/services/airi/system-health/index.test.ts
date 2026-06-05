@@ -6,6 +6,7 @@ import type { NahidaPersonaManager } from '../nahida-persona'
 import type { ProactiveCompanionManager } from '../proactive-companion'
 
 import {
+  createDefaultExternalMemoryJudgementSnapshot,
   createDefaultExternalMemoryTurnSnapshot,
   createDefaultExternalMemoryUsageSnapshot,
   createExternalMemoryReasonSnapshot,
@@ -85,6 +86,10 @@ function createManagerDependencies(overrides?: {
         },
       }),
     }),
+    recordMemoryObservation: async () => createDefaultExternalMemoryJudgementSnapshot(),
+    refreshMemoryJudgement: async () => createDefaultExternalMemoryJudgementSnapshot(),
+    getMemoryJudgementSnapshot: async () => createDefaultExternalMemoryJudgementSnapshot(),
+    clearMemoryCandidateLedger: async () => createDefaultExternalMemoryJudgementSnapshot(),
     clearMemoryWriteCandidateHistory: () => createDefaultExternalMemoryUsageSnapshot(),
     loadMemoryContext: async () => {
       throw new Error('Not used in system-health tests.')

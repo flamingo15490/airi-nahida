@@ -254,10 +254,10 @@ describe('companion coordination snapshot', () => {
     expect(snapshot.attentionCount).toBe(0)
     expect(snapshot.inactiveCount).toBe(0)
     expect(snapshot.surfaces.map(surface => surface.surface)).toEqual(['memory', 'persona', 'proactive'])
-    expect(snapshot.surfaces[0]?.overview.coverage).toContain('user-profile, preferences')
+    expect(snapshot.surfaces[0]?.overview.coverage).toContain('用户信息、偏好设置')
     expect(snapshot.surfaces[1]?.reason.code).toBe('persona-active')
-    expect(snapshot.surfaces[1]?.overview.activity).toBe('Persona mode: balanced. Balanced continuity.')
-    expect(snapshot.surfaces[1]?.overview.coverage).toBe('Card: Nahida. Display model: Nahida.')
+    expect(snapshot.surfaces[1]?.overview.activity).toBe('人格模式：平衡。Balanced continuity.')
+    expect(snapshot.surfaces[1]?.overview.coverage).toBe('角色卡：Nahida。 展示模型：Nahida。')
     expect(snapshot.surfaces[2]?.reason.code).toBe('proactive-ready')
     expect(snapshot.updatedAt).toBe(20)
   })
@@ -310,8 +310,8 @@ describe('companion coordination snapshot', () => {
     expect(snapshot.readyCount).toBe(1)
     expect(snapshot.surfaces[0]?.reason.code).toBe('memory-degraded')
     expect(snapshot.surfaces[1]?.reason.code).toBe('persona-target-mismatch')
-    expect(snapshot.surfaces[1]?.overview.activity).toBe('Persona mode: balanced. Enabled, waiting for a Nahida target.')
-    expect(snapshot.surfaces[1]?.overview.coverage).toBe('Card: ReLU. Display model: ReLU.')
+    expect(snapshot.surfaces[1]?.overview.activity).toBe('人格模式：平衡。已启用，正在等待命中纳西妲目标。')
+    expect(snapshot.surfaces[1]?.overview.coverage).toBe('角色卡：ReLU。 展示模型：ReLU。')
     expect(snapshot.surfaces[2]?.reason.code).toBe('proactive-cooldown-active')
     expect(snapshot.surfaces[2]?.status).toBe('ready')
   })
@@ -330,8 +330,8 @@ describe('companion coordination snapshot', () => {
     expect(snapshot.surfaces[0]?.overview).toMatchObject({
       summary: 'External memory bridge is disabled.',
     })
-    expect(snapshot.surfaces[1]?.overview.activity).toBe('Persona mode: balanced. Disabled by user.')
-    expect(snapshot.surfaces[1]?.overview.coverage).toBe('Card: Nahida. Display model: Nahida.')
+    expect(snapshot.surfaces[1]?.overview.activity).toBe('人格模式：平衡。已由用户关闭。')
+    expect(snapshot.surfaces[1]?.overview.coverage).toBe('角色卡：Nahida。 展示模型：Nahida。')
     expect(snapshot.surfaces[2]?.overview.updatedAt).toBe(30)
   })
 
@@ -350,8 +350,8 @@ describe('companion coordination snapshot', () => {
 
     expect(snapshot.surfaces[1]?.status).toBe('ready')
     expect(snapshot.surfaces[1]?.reason.code).toBe('persona-active')
-    expect(snapshot.surfaces[1]?.overview.activity).toBe('Persona mode: active. Active continuity.')
-    expect(snapshot.surfaces[1]?.overview.coverage).toBe('Card: ReLU. Display model: Nahida.')
+    expect(snapshot.surfaces[1]?.overview.activity).toBe('人格模式：主动。Active continuity.')
+    expect(snapshot.surfaces[1]?.overview.coverage).toBe('角色卡：ReLU。 展示模型：Nahida。')
   })
 
   it('keeps memory ready but marks it empty when the latest context has no stable sections', () => {
@@ -385,8 +385,8 @@ describe('companion coordination snapshot', () => {
     expect(snapshot.surfaces[0]?.status).toBe('ready')
     expect(snapshot.surfaces[0]?.reason.code).toBe('memory-empty')
     expect(snapshot.surfaces[0]?.overview.summary).toBe('External memory bridge is healthy but the latest context is empty.')
-    expect(snapshot.surfaces[0]?.overview.activity).toBe('Latest memory context refresh finished without any stable sections.')
-    expect(snapshot.surfaces[0]?.overview.coverage).toBe('Latest memory coverage: no stable sections were included in the latest context.')
+    expect(snapshot.surfaces[0]?.overview.activity).toBe('最近一次记忆上下文刷新完成，但没有纳入稳定内容。')
+    expect(snapshot.surfaces[0]?.overview.coverage).toBe('最近覆盖：最近一次上下文里没有纳入稳定分层。')
     expect(snapshot.surfaces[0]?.overview.updatedAt).toBe(40)
   })
 
@@ -422,8 +422,8 @@ describe('companion coordination snapshot', () => {
 
     expect(snapshot.surfaces[0]?.status).toBe('inactive')
     expect(snapshot.surfaces[0]?.reason.code).toBe('memory-disabled')
-    expect(snapshot.surfaces[0]?.overview.activity).toBe('Latest memory write skipped follow-ups because it was already up to date.')
-    expect(snapshot.surfaces[0]?.overview.coverage).toBe('Latest memory coverage: awaiting a context refresh after the latest write.')
+    expect(snapshot.surfaces[0]?.overview.activity).toBe('最近写回未更新待跟进，因为内容已经是最新。')
+    expect(snapshot.surfaces[0]?.overview.coverage).toBe('最近覆盖：等待最近一次写回后的上下文刷新。')
     expect(snapshot.surfaces[0]?.overview.updatedAt).toBe(55)
   })
 
@@ -453,9 +453,9 @@ describe('companion coordination snapshot', () => {
 
     expect(snapshot.surfaces[0]?.status).toBe('attention')
     expect(snapshot.surfaces[0]?.reason.code).toBe('memory-degraded')
-    expect(snapshot.surfaces[0]?.overview.reason).toBe('External memory is reachable, but the latest read or write still needs attention before coordination is fully reliable.')
+    expect(snapshot.surfaces[0]?.overview.reason).toBe('记忆桥接可以访问，但最近一次读写结果仍需关注。')
     expect(snapshot.surfaces[0]?.overview.activity).toBe('Recent summary write failed because the bridge timed out.')
-    expect(snapshot.surfaces[0]?.overview.coverage).toBe('Latest memory coverage: awaiting a context refresh after the latest write.')
+    expect(snapshot.surfaces[0]?.overview.coverage).toBe('最近覆盖：等待最近一次写回后的上下文刷新。')
     expect(snapshot.surfaces[0]?.overview.updatedAt).toBe(62)
   })
 
@@ -472,9 +472,90 @@ describe('companion coordination snapshot', () => {
 
     expect(snapshot.surfaces[0]?.status).toBe('attention')
     expect(snapshot.surfaces[0]?.reason.code).toBe('memory-unavailable')
-    expect(snapshot.surfaces[0]?.overview.activity).toBe('No external memory activity has been recorded yet.')
-    expect(snapshot.surfaces[0]?.overview.coverage).toBe('Latest memory coverage: none recorded yet.')
+    expect(snapshot.surfaces[0]?.overview.activity).toBe('还没有记录到记忆活动。')
+    expect(snapshot.surfaces[0]?.overview.coverage).toBe('最近覆盖：暂无记录。')
     expect(snapshot.surfaces[0]?.overview.updatedAt).toBeUndefined()
+  })
+
+  it('surfaces conflicted candidates and recent stable candidate writeback in the memory surface', () => {
+    const snapshot = composeCompanionCoordinationSnapshot({
+      memoryUsage: {
+        ...createDefaultExternalMemoryUsageSnapshot(),
+        bridgeState: 'ready',
+        reason: createExternalMemoryReasonSnapshot('bridge-ready'),
+        summary: 'External memory bridge is healthy.',
+        lastReadAt: 70,
+        lastUsedDocumentKinds: ['preferences'],
+        context: createMemoryContextSnapshot({
+          summary: 'Loaded preferences.',
+          readAt: 70,
+          usedKinds: ['preferences'],
+          usedLayers: ['stable-preferences'],
+          sections: {
+            userProfile: [],
+            preferences: ['Prefers concise replies.'],
+            followUps: [],
+            recentSummary: [],
+            characterKnowledge: [],
+          },
+        }),
+        judgement: {
+          ...createDefaultExternalMemoryUsageSnapshot().judgement!,
+          summary: '1 conflicted candidate still needs review.',
+          reason: 'A newer candidate conflicts with an existing structured value.',
+          statusCounts: {
+            tentative: 0,
+            stable: 1,
+            conflicted: 1,
+            suppressed: 0,
+          },
+          conflicts: [{
+            id: 'conflict-1',
+            kind: 'preferences',
+            candidateId: 'candidate-2',
+            structuredKey: 'reply-style',
+            existingText: 'reply style: concise',
+            incomingText: 'reply style: playful',
+            summary: 'Reply style candidates conflict.',
+            reason: 'The incoming value disagrees with an existing stable candidate.',
+          }],
+          candidates: [],
+          recommendations: [],
+        },
+        lastWrite: {
+          kind: 'preferences',
+          layer: 'stable-preferences',
+          ok: true,
+          changed: true,
+          decision: 'written',
+          reason: createExternalMemoryReasonSnapshot('write-written'),
+          summary: 'Stable preference candidate was written back.',
+          writtenAt: 71,
+          review: {
+            reviewedAt: 71,
+            summary: 'Reviewed stable preference candidate.',
+            decision: 'written',
+            reason: createExternalMemoryReasonSnapshot('write-written'),
+            candidates: [{
+              layer: 'stable-preferences',
+              kind: 'preferences',
+              source: 'manual-candidate-review',
+              summary: 'Stable preference candidate',
+              addItems: ['Prefer concise replies'],
+              removeItems: [],
+            }],
+          },
+        },
+        recentWrites: [],
+      },
+      persona: createDisabledPersonaSnapshot(),
+      proactiveRuntime: createDisabledProactiveRuntimeSnapshot(),
+    })
+
+    expect(snapshot.surfaces[0]?.overview.activity).toContain('conflicted candidate')
+    expect(snapshot.surfaces[0]?.overview.activity).toContain('stable candidate 写回')
+    expect(snapshot.surfaces[0]?.overview.coverage).toContain('conflicted candidate')
+    expect(snapshot.surfaces[0]?.overview.coverage).toContain('stable candidate 写回')
   })
 
   it('keeps proactive ready with cooldown copy when lastDecision is missing but recent history still has an active cooldown', () => {
@@ -508,8 +589,8 @@ describe('companion coordination snapshot', () => {
 
     expect(snapshot.surfaces[2]?.status).toBe('ready')
     expect(snapshot.surfaces[2]?.reason.code).toBe('proactive-cooldown-active')
-    expect(snapshot.surfaces[2]?.overview.activity).toBe('Latest decision: suppressed. 1 recent decisions are available.')
-    expect(snapshot.surfaces[2]?.overview.coverage).toBe('Sidecar: Companion sidecar is connected to the current AIRI server channel.')
+    expect(snapshot.surfaces[2]?.overview.activity).toBe('最近判定：已压制。当前可查看 1 条最近判定。')
+    expect(snapshot.surfaces[2]?.overview.coverage).toBe('sidecar：Companion sidecar is connected to the current AIRI server channel.')
     expect(snapshot.surfaces[2]?.overview.updatedAt).toBe(20)
   })
 
@@ -558,8 +639,8 @@ describe('companion coordination snapshot', () => {
 
     expect(snapshot.surfaces[2]?.status).toBe('ready')
     expect(snapshot.surfaces[2]?.reason.code).toBe('proactive-ready')
-    expect(snapshot.surfaces[2]?.overview.activity).toBe('Latest decision: delivered. 1 recent decisions are available.')
-    expect(snapshot.surfaces[2]?.overview.coverage).toBe('Sidecar: connected.')
+    expect(snapshot.surfaces[2]?.overview.activity).toBe('最近判定：已放行。当前可查看 1 条最近判定。')
+    expect(snapshot.surfaces[2]?.overview.coverage).toBe('sidecar：已连接。')
   })
 
   it('refreshes, clears history, and exposes detail routes through the desktop bridge', async () => {

@@ -36,10 +36,14 @@ import {
   electronCompanionCoordinationGetSnapshot,
   electronCompanionCoordinationRefresh,
   electronCompanionCoordinationRefreshForSparkNotify,
+  electronExternalMemoryClearMemoryCandidateLedger,
   electronExternalMemoryClearWriteCandidateHistory,
   electronExternalMemoryGetLastUsage,
+  electronExternalMemoryGetMemoryJudgementSnapshot,
   electronExternalMemoryLoadContext,
+  electronExternalMemoryRecordMemoryObservation,
   electronExternalMemoryRefreshContext,
+  electronExternalMemoryRefreshMemoryJudgement,
   electronExternalMemoryWriteFollowUpItems,
   electronExternalMemoryWritePreferencesPatch,
   electronExternalMemoryWriteRecentSummary,
@@ -136,6 +140,10 @@ const saveNahidaPersonaConfig = useElectronEventaInvoke(electronNahidaPersonaSav
 const loadExternalMemoryContext = useElectronEventaInvoke(electronExternalMemoryLoadContext)
 const refreshExternalMemoryContext = useElectronEventaInvoke(electronExternalMemoryRefreshContext)
 const getExternalMemoryUsage = useElectronEventaInvoke(electronExternalMemoryGetLastUsage)
+const recordExternalMemoryObservation = useElectronEventaInvoke(electronExternalMemoryRecordMemoryObservation)
+const refreshExternalMemoryJudgement = useElectronEventaInvoke(electronExternalMemoryRefreshMemoryJudgement)
+const getExternalMemoryJudgementSnapshot = useElectronEventaInvoke(electronExternalMemoryGetMemoryJudgementSnapshot)
+const clearExternalMemoryCandidateLedger = useElectronEventaInvoke(electronExternalMemoryClearMemoryCandidateLedger)
 const clearExternalMemoryWriteCandidateHistory = useElectronEventaInvoke(electronExternalMemoryClearWriteCandidateHistory)
 const writeExternalMemoryRecentSummary = useElectronEventaInvoke(electronExternalMemoryWriteRecentSummary)
 const writeExternalMemoryFollowUpItems = useElectronEventaInvoke(electronExternalMemoryWriteFollowUpItems)
@@ -301,6 +309,10 @@ externalMemoryStore.setBridge({
   loadMemoryContext: request => loadExternalMemoryContext(request),
   refreshMemoryContext: request => refreshExternalMemoryContext(request),
   getLastMemoryUsage: () => getExternalMemoryUsage(),
+  recordMemoryObservation: request => recordExternalMemoryObservation(request),
+  refreshMemoryJudgement: () => refreshExternalMemoryJudgement(),
+  getMemoryJudgementSnapshot: () => getExternalMemoryJudgementSnapshot(),
+  clearMemoryCandidateLedger: () => clearExternalMemoryCandidateLedger(),
   clearMemoryWriteCandidateHistory: () => clearExternalMemoryWriteCandidateHistory(),
   writeRecentSummary: request => writeExternalMemoryRecentSummary(request),
   writeFollowUpItems: request => writeExternalMemoryFollowUpItems(request),

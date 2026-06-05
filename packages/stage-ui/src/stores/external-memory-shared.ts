@@ -34,9 +34,29 @@ export const EXTERNAL_MEMORY_REASON_CODES = [
   'write-skipped-not-stable',
 ] as const
 
+export const EXTERNAL_MEMORY_OBSERVATION_SOURCES = [
+  'user-turn-profile',
+  'user-turn-preferences',
+  'user-turn-follow-ups',
+  'assistant-turn-summary',
+  'manual-session-summary',
+  'manual-candidate-review',
+  'system-refresh',
+] as const
+
+export const EXTERNAL_MEMORY_CANDIDATE_STATUSES = [
+  'tentative',
+  'stable',
+  'conflicted',
+  'suppressed',
+] as const
+
 export type ExternalMemoryDocumentKind = typeof EXTERNAL_MEMORY_DOCUMENT_KINDS[number]
 export type ExternalMemoryLayerKind = typeof EXTERNAL_MEMORY_LAYER_KINDS[number]
 export type ExternalMemoryReasonCode = typeof EXTERNAL_MEMORY_REASON_CODES[number]
+export type ExternalMemoryObservationSource = typeof EXTERNAL_MEMORY_OBSERVATION_SOURCES[number]
+export type ExternalMemoryCandidateKind = ExternalMemoryDocumentKind
+export type ExternalMemoryCandidateStatus = typeof EXTERNAL_MEMORY_CANDIDATE_STATUSES[number]
 export type ExternalMemoryCapabilityState = 'ready' | 'degraded' | 'disabled' | 'unavailable'
 export type ExternalMemoryWriteDecision
   = | 'written'
@@ -81,6 +101,116 @@ export interface ExternalMemoryReasonSnapshot {
   code: ExternalMemoryReasonCode
   /** Frozen user-facing copy for the reason code. */
   message: string
+}
+
+/**
+ * One external-memory observation recorded into the phase-nine candidate ledger.
+ */
+export interface ExternalMemoryObservationRecord {
+  /** Frozen candidate kind that the observation belongs to. */
+  kind: ExternalMemoryCandidateKind
+  /** Stable observation source used for diagnostics and UI. */
+  source: ExternalMemoryObservationSource
+  /** Raw observation text before renderer display. */
+  text: string
+  /** Optional active character name associated with the observation. */
+  characterName?: string
+  /** Optional caller-provided timestamp for deterministic tests. */
+  observedAt?: number
+  /** Optional explicit strong-signal hint from upstream extractors. */
+  strongSignal?: boolean
+  /** Optional explicit actionable hint for follow-up observations. */
+  actionable?: boolean
+}
+
+/**
+ * Frozen conflict explanation for one candidate that cannot be written back safely.
+ */
+export interface ExternalMemoryConflictSnapshot {
+  /** Stable conflict identifier scoped to the current judgement snapshot. */
+  id: string
+  /** Candidate kind that the conflict belongs to. */
+  kind: ExternalMemoryCandidateKind
+  /** Candidate identifier blocked by this conflict. */
+  candidateId: string
+  /** Optional structured key used to detect the conflict. */
+  structuredKey?: string
+  /** Existing persisted text or competing candidate text. */
+  existingText?: string
+  /** Incoming candidate text that triggered the conflict. */
+  incomingText: string
+  /** One-line summary for renderer and diagnostics surfaces. */
+  summary: string
+  /** User-facing explanation of why the candidate is blocked. */
+  reason: string
+}
+
+/**
+ * Renderer-safe candidate snapshot derived from the userData judgement ledger.
+ */
+export interface ExternalMemoryCandidateSnapshot {
+  /** Stable candidate identifier scoped to the ledger entry. */
+  id: string
+  /** Candidate kind under review. */
+  kind: ExternalMemoryCandidateKind
+  /** Latest observation source that updated this candidate. */
+  source: ExternalMemoryObservationSource
+  /** Frozen candidate lifecycle status. */
+  status: ExternalMemoryCandidateStatus
+  /** Latest raw candidate text kept for review UI. */
+  text: string
+  /** Stable comparison text used for ledger dedupe. */
+  normalizedText: string
+  /** One-line renderer summary for this candidate. */
+  summary: string
+  /** User-facing reason explaining the current candidate status. */
+  reason: string
+  /** UNIX timestamp for the first observation kept in the ledger. */
+  firstObservedAt: number
+  /** UNIX timestamp for the latest observation kept in the ledger. */
+  lastObservedAt: number
+  /** Number of consistent observations merged into this candidate. */
+  observationCount: number
+  /** Whether the candidate was explicitly marked as a strong stable signal. */
+  strongSignal: boolean
+}
+
+/**
+ * Controlled write recommendation derived from the judgement snapshot.
+ */
+export interface ExternalMemoryWriteRecommendation {
+  /** Candidate kind that the runtime may write back. */
+  kind: ExternalMemoryCandidateKind
+  /** Candidate identifiers included in this recommendation batch. */
+  candidateIds: string[]
+  /** Stable items that are safe to write back. */
+  addItems: string[]
+  /** One-line recommendation summary for renderer surfaces. */
+  summary: string
+  /** User-facing explanation of why the recommendation is or is not writable. */
+  reason: string
+}
+
+/**
+ * Renderer-visible phase-nine memory judgement snapshot.
+ */
+export interface ExternalMemoryJudgementSnapshot {
+  /** UNIX timestamp for the latest judgement refresh. */
+  refreshedAt: number
+  /** Best-effort absolute JSON ledger path under the AIRI userData directory. */
+  candidateLedgerPath?: string
+  /** One-line aggregate summary for the latest judgement pass. */
+  summary: string
+  /** User-facing explanation of the latest judgement pass. */
+  reason: string
+  /** Candidate status counters for renderer overviews. */
+  statusCounts: Record<ExternalMemoryCandidateStatus, number>
+  /** Frozen candidate snapshots currently tracked by the ledger. */
+  candidates: ExternalMemoryCandidateSnapshot[]
+  /** Frozen conflicts that block write-back recommendations. */
+  conflicts: ExternalMemoryConflictSnapshot[]
+  /** Stable write recommendations derived from the current candidates. */
+  recommendations: ExternalMemoryWriteRecommendation[]
 }
 
 /**
@@ -341,6 +471,8 @@ export interface ExternalMemoryUsageSnapshot {
   lastWrite?: ExternalMemoryWriteResult
   /** Latest renderer-safe write review snapshot. */
   lastWriteReview?: ExternalMemoryWriteReviewSnapshot
+  /** Latest renderer-visible memory judgement snapshot. */
+  judgement?: ExternalMemoryJudgementSnapshot
   /** Small write-back history shown in the desktop settings page. */
   recentWrites: ExternalMemoryWriteResult[]
   /** Document kinds that the latest context actually contributed to prompts. */
@@ -411,6 +543,26 @@ export function createDefaultExternalMemoryWriteReviewSnapshot(): ExternalMemory
 }
 
 /**
+ * Creates an empty judgement snapshot before any phase-nine observation is recorded.
+ */
+export function createDefaultExternalMemoryJudgementSnapshot(): ExternalMemoryJudgementSnapshot {
+  return {
+    refreshedAt: 0,
+    summary: '尚未记录任何记忆判断。',
+    reason: '第九阶段候选账本当前为空。',
+    statusCounts: {
+      tentative: 0,
+      stable: 0,
+      conflicted: 0,
+      suppressed: 0,
+    },
+    candidates: [],
+    conflicts: [],
+    recommendations: [],
+  }
+}
+
+/**
  * Empty usage snapshot used before any desktop bridge is attached.
  */
 export function createDefaultExternalMemoryUsageSnapshot(): ExternalMemoryUsageSnapshot {
@@ -420,6 +572,7 @@ export function createDefaultExternalMemoryUsageSnapshot(): ExternalMemoryUsageS
     summary: '当前运行时尚未提供可用的记忆桥接。',
     turn: createDefaultExternalMemoryTurnSnapshot(),
     lastWriteReview: createDefaultExternalMemoryWriteReviewSnapshot(),
+    judgement: createDefaultExternalMemoryJudgementSnapshot(),
     recentWrites: [],
     lastUsedDocumentKinds: [],
   }
