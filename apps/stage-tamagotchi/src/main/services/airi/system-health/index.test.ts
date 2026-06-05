@@ -644,13 +644,12 @@ describe('system health service', () => {
       emit: vi.fn(),
     }
 
-    vi.doMock('@moeru/eventa/adapters/electron/main', async (importOriginal) => {
-      const actual = await importOriginal<typeof import('@moeru/eventa/adapters/electron/main')>()
-      return {
-        ...actual,
-        createContext: () => ({ context }),
-      }
-    })
+    vi.doMock('@moeru/eventa/adapters/electron/main', () => ({
+      createContext: () => ({
+        context,
+        dispose: () => {},
+      }),
+    }))
 
     vi.doMock('@moeru/eventa', async (importOriginal) => {
       const actual = await importOriginal<typeof import('@moeru/eventa')>()
