@@ -1,0 +1,161 @@
+import type { NahidaPersonaSettings, NahidaPersonaSnapshot } from './nahida-persona-shared'
+
+import { errorMessageFrom } from '@moeru/std'
+import { defineStore } from 'pinia'
+import { computed, ref, toRaw } from 'vue'
+
+import { composeTrustedMemoryGuardrails } from './external-memory'
+import { useExternalMemoryStore } from './external-memory-store'
+import { useAiriCardStore } from './modules/airi-card'
+import {
+  composeNahidaPersonaSnapshot,
+  composeNahidaPersonaSupplement,
+  getNahidaPersonaDisplayModeSummary,
+  getNahidaPersonaDisplaySectionPreviews,
+  getNahidaPersonaDisplaySummary,
+  getNahidaPersonaModeBehavior,
+  getNahidaPersonaModeDisplayLabel,
+  getNahidaPersonaSectionPreviews,
+  isNahidaPersonaTarget,
+} from './nahida-persona'
+import { createDefaultNahidaPersonaSettings } from './nahida-persona-shared'
+import { useSettingsStageModel } from './settings/stage-model'
+
+/**
+ * Runtime bridge implemented by desktop hosts to persist Nahida persona
+ * settings outside renderer-local storage.
+ */
+export interface NahidaPersonaBridge {
+  getConfig: () => Promise<NahidaPersonaSettings>
+  saveConfig: (settings: NahidaPersonaSettings) => Promise<NahidaPersonaSettings>
+}
+
+export const useNahidaPersonaStore = defineStore('nahida-persona', () => {
+  const cardStore = useAiriCardStore()
+  const stageModelStore = useSettingsStageModel()
+  const externalMemoryStore = useExternalMemoryStore()
+  const bridge = ref<NahidaPersonaBridge>()
+  const settings = ref<NahidaPersonaSettings>(createDefaultNahidaPersonaSettings())
+  const loading = ref(false)
+  const saving = ref(false)
+  const error = ref<string>()
+
+  const activeCardName = computed(() => cardStore.activeCard?.name?.trim())
+  const activeDisplayModelName = computed(() => stageModelStore.stageModelSelectedDisplayModel?.name?.trim())
+  const matchesActiveCard = computed(() => isNahidaPersonaTarget({
+    cardName: activeCardName.value,
+    displayModelName: activeDisplayModelName.value,
+  }))
+  const isActive = computed(() => settings.value.enabled && matchesActiveCard.value)
+  const activeModeBehavior = computed(() => getNahidaPersonaModeBehavior(settings.value.mode))
+  const sections = computed(() => getNahidaPersonaSectionPreviews(settings.value.mode))
+  const activeSupplement = computed(() => composeNahidaPersonaSupplement({
+    card: cardStore.activeCard,
+    displayModelName: activeDisplayModelName.value,
+    settings: settings.value,
+    trustedMemoryGuardrails: composeTrustedMemoryGuardrails({
+      judgement: externalMemoryStore.judgementSnapshot,
+      turn: externalMemoryStore.turnSnapshot,
+    }),
+  }))
+  const activeModeSummary = computed(() => activeModeBehavior.value.summary)
+  const displayModeLabel = computed(() => getNahidaPersonaModeDisplayLabel(settings.value.mode))
+  const displayActiveModeSummary = computed(() => getNahidaPersonaDisplayModeSummary(settings.value.mode))
+  const displaySections = computed(() => getNahidaPersonaDisplaySectionPreviews(settings.value.mode))
+  const summary = computed(() => getNahidaPersonaDisplaySummary({
+    enabled: settings.value.enabled,
+    matchesActiveCard: matchesActiveCard.value,
+    mode: settings.value.mode,
+  }))
+  const displaySummary = computed(() => getNahidaPersonaDisplaySummary({
+    enabled: settings.value.enabled,
+    matchesActiveCard: matchesActiveCard.value,
+    mode: settings.value.mode,
+  }))
+  const snapshot = computed<NahidaPersonaSnapshot>(() => composeNahidaPersonaSnapshot({
+    settings: settings.value,
+    context: {
+      activeCardName: activeCardName.value,
+      activeDisplayModelName: activeDisplayModelName.value,
+    },
+  }))
+
+  function setBridge(nextBridge: NahidaPersonaBridge) {
+    bridge.value = nextBridge
+  }
+
+  function applySettings(nextSettings: NahidaPersonaSettings) {
+    settings.value = {
+      ...createDefaultNahidaPersonaSettings(),
+      ...nextSettings,
+    }
+  }
+
+  async function withBridge<T>(run: (activeBridge: NahidaPersonaBridge) => Promise<T>) {
+    if (!bridge.value) {
+      throw new Error('Nahida persona bridge is not available in this runtime.')
+    }
+
+    return await run(bridge.value)
+  }
+
+  async function refresh() {
+    loading.value = true
+    error.value = undefined
+
+    try {
+      applySettings(await withBridge(activeBridge => activeBridge.getConfig()))
+      return settings.value
+    }
+    catch (cause) {
+      error.value = errorMessageFrom(cause) ?? 'Failed to load Nahida persona settings.'
+      throw cause
+    }
+    finally {
+      loading.value = false
+    }
+  }
+
+  async function save() {
+    saving.value = true
+    error.value = undefined
+
+    try {
+      const nextSettings = structuredClone(toRaw(settings.value))
+      applySettings(await withBridge(activeBridge => activeBridge.saveConfig(nextSettings)))
+      return settings.value
+    }
+    catch (cause) {
+      error.value = errorMessageFrom(cause) ?? 'Failed to save Nahida persona settings.'
+      throw cause
+    }
+    finally {
+      saving.value = false
+    }
+  }
+
+  return {
+    activeCardName,
+    activeDisplayModelName,
+    activeModeSummary,
+    activeSupplement,
+    displayActiveModeSummary,
+    displayModeLabel,
+    displaySections,
+    displaySummary,
+    error,
+    isActive,
+    loading,
+    matchesActiveCard,
+    saving,
+    sections,
+    settings,
+    snapshot,
+    summary,
+
+    applySettings,
+    refresh,
+    save,
+    setBridge,
+  }
+})

@@ -17,12 +17,16 @@ import { createMinecraftContext } from './chat/context-providers'
 import { useChatContextStore } from './chat/context-store'
 import { useChatSessionStore } from './chat/session-store'
 import { useChatStreamStore } from './chat/stream-store'
+import { useCompanionCoordinationStore } from './companion-coordination-store'
 import { useContextObservabilityStore } from './devtools/context-observability'
+import { useExternalMemoryStore } from './external-memory-store'
 import { useLLM } from './llm'
 import { useLlmToolsetPromptsStore } from './llm-toolset-prompts'
 import { useAiriCardStore } from './modules/airi-card'
 import { useAutonomousArtistryStore } from './modules/artistry-autonomous'
 import { useConsciousnessStore } from './modules/consciousness'
+import { joinPromptSections } from './nahida-persona'
+import { useNahidaPersonaStore } from './nahida-persona-store'
 
 interface ForkOptions {
   fromSessionId?: string
@@ -46,6 +50,9 @@ export type { QueuedSendSnapshot, ChatOrchestratorSendOptions as SendOptions } f
 export const useChatOrchestratorStore = defineStore('chat-orchestrator', () => {
   const llmStore = useLLM()
   const llmToolsetPromptsStore = useLlmToolsetPromptsStore()
+  const externalMemoryStore = useExternalMemoryStore()
+  const coordinationStore = useCompanionCoordinationStore()
+  const nahidaPersonaStore = useNahidaPersonaStore()
   const consciousnessStore = useConsciousnessStore()
   const artistryAutonomousStore = useAutonomousArtistryStore()
   const { activeProvider } = storeToRefs(consciousnessStore)
@@ -156,7 +163,12 @@ export const useChatOrchestratorStore = defineStore('chat-orchestrator', () => {
     },
     getActiveSessionId: () => activeSessionId.value,
     getActiveProvider: () => activeProvider.value,
-    getSystemPromptSupplement: () => llmToolsetPromptsStore.activeToolsetPrompt,
+    getSystemPromptSupplement: () => joinPromptSections(
+      llmToolsetPromptsStore.activeToolsetPrompt,
+      externalMemoryStore.activeSupplement,
+      nahidaPersonaStore.activeSupplement,
+      coordinationStore.activeSupplement,
+    ),
     runtimeContextProviders: [
       createMinecraftContext,
     ],
@@ -208,11 +220,19 @@ export const useChatOrchestratorStore = defineStore('chat-orchestrator', () => {
       }
     },
     onUserTurnReady: ({ messageText, sessionMessages }) => {
+      void externalMemoryStore.captureUserTurn({ messageText }).catch((error) => {
+        console.warn('[external-memory] Failed to capture user turn:', error)
+      })
+
       const autonomousTarget = cardStore.activeCard?.extensions?.airi?.modules?.artistry?.autonomousTarget || 'user'
       if (autonomousTarget === 'user')
         void artistryAutonomousStore.runArtistTask(messageText, toProviderHistory(sessionMessages))
     },
     onAssistantTurnReady: ({ messageText, sessionMessages }) => {
+      void externalMemoryStore.captureAssistantTurn({ sessionMessages }).catch((error) => {
+        console.warn('[external-memory] Failed to capture assistant turn:', error)
+      })
+
       const artistry = cardStore.activeCard?.extensions?.airi?.modules?.artistry
       if (artistry?.autonomousEnabled && artistry?.autonomousTarget === 'assistant')
         void artistryAutonomousStore.runArtistTask(messageText, toProviderHistory(sessionMessages))
@@ -229,6 +249,13 @@ export const useChatOrchestratorStore = defineStore('chat-orchestrator', () => {
     options: ChatOrchestratorSendOptions,
     targetSessionId?: string,
   ) {
+    await externalMemoryStore.refreshContext().catch((error) => {
+      console.warn('[external-memory] Failed to refresh prompt context:', error)
+    })
+    await coordinationStore.refresh().catch((error) => {
+      console.warn('[companion-coordination] Failed to refresh coordination snapshot before send:', error)
+    })
+
     return runtime.ingest(sendingMessage, options, targetSessionId)
   }
 

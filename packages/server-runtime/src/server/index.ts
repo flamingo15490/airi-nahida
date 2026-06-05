@@ -1,4 +1,4 @@
-import type { AppOptions } from '..'
+import type { AppOptions, ServerRuntimeModuleSnapshot } from '..'
 
 import { isIP } from 'node:net'
 import { networkInterfaces } from 'node:os'
@@ -26,6 +26,7 @@ interface ServerInstance {
 
 export interface Server {
   getConnectionHost: () => string[]
+  getModuleSnapshot: () => ServerRuntimeModuleSnapshot[]
   start: () => Promise<void>
   stop: () => Promise<void>
   restart: () => Promise<void>
@@ -109,6 +110,7 @@ export function createServer(opts?: ServerOptions): Server {
   const { appLogFormat, appLogLevel } = normalizeLoggerConfig(options)
   const log = useLogg('@proj-airi/server-runtime/server').withLogLevelString(appLogLevel).withFormat(appLogFormat)
   let serverInstance: ServerInstance | null = null
+  let getModuleSnapshotFromRuntime: (() => ServerRuntimeModuleSnapshot[]) | null = null
   let startTask: Promise<void> | null = null
 
   log.withFields({ hasTlsConfig: !!options?.tlsConfig }).log('creating server channel')
@@ -151,6 +153,7 @@ export function createServer(opts?: ServerOptions): Server {
     startTask = (async () => {
       const secureEnabled = options?.tlsConfig != null
       const h3App = setupApp(options)
+      getModuleSnapshotFromRuntime = h3App.getModuleSnapshot
 
       const port = options.port
       const hostname = options.hostname
@@ -174,6 +177,7 @@ export function createServer(opts?: ServerOptions): Server {
         serverInstance = {
           close: async (closeActiveConnections = false) => {
             h3App.dispose()
+            getModuleSnapshotFromRuntime = null
             log.log('closing server instance')
             await instance.close(closeActiveConnections)
             log.log('server instance closed')
@@ -194,6 +198,7 @@ export function createServer(opts?: ServerOptions): Server {
       }
       catch (error) {
         serverInstance = null
+        getModuleSnapshotFromRuntime = null
         h3App.dispose()
         await instance.close(true).catch(() => {})
         if (isAddressInUseError(error)) {
@@ -231,6 +236,7 @@ export function createServer(opts?: ServerOptions): Server {
 
       return getLocalIPs()
     },
+    getModuleSnapshot: () => getModuleSnapshotFromRuntime?.() ?? [],
     start,
     stop,
     restart,

@@ -19,7 +19,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { sparkNotifyCommandSchema, useCharacterOrchestratorStore } from '.'
 import { useCharacterStore } from '..'
 import { useLLM } from '../../llm'
+import { useModsServerChannelStore } from '../../mods/api/channel-server'
 import { useAiriCardStore, useConsciousnessStore } from '../../modules'
+import { useNahidaPersonaStore } from '../../nahida-persona-store'
+import { useProactiveCompanionStore } from '../../proactive-companion-store'
 import { useProvidersStore } from '../../providers'
 
 vi.mock('vue-i18n', () => ({
@@ -109,6 +112,7 @@ describe('store character-orchestrator', () => {
     const mockGetProviderInstance = vi.fn()
     mockedStore(useProvidersStore).getProviderInstance = mockGetProviderInstance
     mockedStore(useProvidersStore).getProviderInstance.mockResolvedValue({ chat: (_model: string) => ({} as any) })
+    mockedStore(useModsServerChannelStore).onEvent = vi.fn((_type: string, _callback: unknown) => () => {})
 
     const consciousnessStore = useConsciousnessStore(pinia)
     consciousnessStore.activeProvider = 'mock-provider'
@@ -324,5 +328,306 @@ describe('store character-orchestrator', () => {
     const renderedMessages = mockStream.mock.calls[0]?.[2] as Array<{ role: string, content: string }> | undefined
     expect(String(renderedMessages?.[0]?.content)).toContain('Plugin-specific hint')
     expect(String(renderedMessages?.[1]?.content)).toContain('Rendered board snapshot')
+  })
+
+  it('reuses the same Nahida supplement for spark:notify reactions', async () => {
+    const airiCardStore = useAiriCardStore()
+    // @ts-expect-error - testing purpose
+    airiCardStore.systemPrompt = 'Base Nahida prompt.'
+    // @ts-expect-error - testing purpose
+    airiCardStore.activeCard = {
+      name: 'Nahida',
+      version: '1.0',
+      extensions: {
+        airi: {
+          agents: {},
+          modules: {
+            consciousness: {
+              provider: 'mock-provider',
+              model: 'mock-model',
+            },
+            speech: {
+              provider: 'mock-speech-provider',
+              model: 'mock-speech-model',
+              voice_id: 'alloy',
+            },
+          },
+        },
+      },
+    } satisfies AiriCard
+
+    const personaStore = useNahidaPersonaStore()
+    personaStore.applySettings({
+      enabled: true,
+      mode: 'active',
+    })
+
+    const mockStream = vi.fn()
+    mockedStore(useLLM).stream = mockStream
+    mockedStore(useLLM).stream.mockImplementation(async (_model: string, _provider: unknown, _messages: unknown, options: any) => {
+      await options?.onStreamEvent?.({ type: 'text-delta', text: 'I am still here with you.' } satisfies StreamEvent)
+      await options?.onStreamEvent?.({ type: 'finish' } satisfies StreamEvent)
+    })
+
+    const onDelta = vi.fn()
+    const onEnd = vi.fn()
+    mockedStore(useCharacterStore).onSparkNotifyReactionStreamEvent = onDelta
+    mockedStore(useCharacterStore).onSparkNotifyReactionStreamEnd = onEnd
+
+    const store = useCharacterOrchestratorStore()
+    const event: WebSocketEventOf<'spark:notify'> = {
+      type: 'spark:notify',
+      source: 'plugin:airi-plugin-game-chess',
+      data: {
+        id: nanoid(),
+        eventId: nanoid(),
+        kind: 'ping',
+        urgency: 'immediate',
+        headline: 'Check in gently',
+        destinations: ['character'],
+      },
+    }
+
+    await store.handleSparkNotifyWithReaction(event, {
+      forceTextResponse: true,
+    })
+
+    const renderedMessages = mockStream.mock.calls[0]?.[2] as Array<{ role: string, content: string }> | undefined
+    expect(String(renderedMessages?.[0]?.content)).toContain('Base Nahida prompt.')
+    expect(String(renderedMessages?.[0]?.content)).toContain('[Nahida Persona Supplement]')
+    expect(String(renderedMessages?.[0]?.content)).toContain('Memory boundaries: active')
+    expect(String(renderedMessages?.[0]?.content)).toContain('For reminders or check-ins, observe first, then offer one brief, warm nudge.')
+    expect(onDelta).toBeCalled()
+    expect(onEnd).toBeCalled()
+  })
+
+  it('routes managed proactive companion events through the text-only reminder path', async () => {
+    let sparkNotifyListener: ((event: WebSocketEventOf<'spark:notify'>) => Promise<void>) | undefined
+    mockedStore(useModsServerChannelStore).onEvent = vi.fn((type: string, callback: unknown) => {
+      if (type === 'spark:notify') {
+        sparkNotifyListener = callback as (event: WebSocketEventOf<'spark:notify'>) => Promise<void>
+      }
+
+      return () => {}
+    })
+
+    const proactiveStore = useProactiveCompanionStore()
+    proactiveStore.setBridge({
+      loadConfig: async () => ({
+        enabled: true,
+        globalCooldownMs: 180000,
+        topicCooldownMs: 600000,
+        intensity: 'low',
+      }),
+      saveConfig: async settings => settings,
+      getRuntimeSnapshot: async () => ({
+        settings: {
+          enabled: true,
+          globalCooldownMs: 180000,
+          topicCooldownMs: 600000,
+          intensity: 'low',
+        },
+        state: 'ready',
+        summary: 'ready',
+        sidecarConnected: true,
+        sidecarSummary: 'ready',
+        recentDecisions: [],
+        refreshedAt: 1,
+      }),
+      refreshRuntime: async () => ({
+        settings: {
+          enabled: true,
+          globalCooldownMs: 180000,
+          topicCooldownMs: 600000,
+          intensity: 'low',
+        },
+        state: 'ready',
+        summary: 'ready',
+        sidecarConnected: true,
+        sidecarSummary: 'ready',
+        recentDecisions: [],
+        refreshedAt: 1,
+      }),
+      clearHistory: async () => ({
+        settings: {
+          enabled: true,
+          globalCooldownMs: 180000,
+          topicCooldownMs: 600000,
+          intensity: 'low',
+        },
+        state: 'ready',
+        summary: 'ready',
+        sidecarConnected: true,
+        sidecarSummary: 'ready',
+        recentDecisions: [],
+        refreshedAt: 1,
+      }),
+      recordContextUpdate: async () => ({
+        settings: {
+          enabled: true,
+          globalCooldownMs: 180000,
+          topicCooldownMs: 600000,
+          intensity: 'low',
+        },
+        state: 'ready',
+        summary: 'ready',
+        sidecarConnected: true,
+        sidecarSummary: 'ready',
+        recentDecisions: [],
+        refreshedAt: 1,
+      }),
+      evaluateSparkNotify: async () => ({
+        managed: true,
+        decision: {
+          event: {
+            id: 'sidecar-1',
+            source: 'plugin:local.proactive-companion',
+            kind: 'reminder',
+            headline: 'Drink water soon',
+            topicKey: 'drink water soon',
+            destinations: ['character'],
+            receivedAt: 1,
+          },
+          decision: 'delivered',
+          reason: 'approved',
+          presentation: 'light-prompt',
+          matchedSource: true,
+          sidecarReady: true,
+          decidedAt: 2,
+        },
+        runtime: {
+          settings: {
+            enabled: true,
+            globalCooldownMs: 180000,
+            topicCooldownMs: 600000,
+            intensity: 'low',
+          },
+          state: 'ready',
+          summary: 'ready',
+          sidecarConnected: true,
+          sidecarSummary: 'ready',
+          recentDecisions: [],
+          refreshedAt: 2,
+        },
+      }),
+    })
+
+    const mockStream = vi.fn()
+    mockedStore(useLLM).stream = mockStream
+    mockedStore(useLLM).stream.mockImplementation(async (_model: string, _provider: unknown, _messages: unknown, options: any) => {
+      await options?.onStreamEvent?.({ type: 'text-delta', text: 'Please remember to rest a little.' } satisfies StreamEvent)
+      await options?.onStreamEvent?.({ type: 'finish' } satisfies StreamEvent)
+    })
+
+    const onDelta = vi.fn()
+    const onEnd = vi.fn()
+    mockedStore(useCharacterStore).onSparkNotifyReactionStreamEvent = onDelta
+    mockedStore(useCharacterStore).onSparkNotifyReactionStreamEnd = onEnd
+
+    const store = useCharacterOrchestratorStore()
+    store.initialize()
+
+    await sparkNotifyListener?.({
+      type: 'spark:notify',
+      source: 'plugin:local.proactive-companion',
+      data: {
+        id: 'sidecar-1',
+        eventId: 'sidecar-1',
+        kind: 'reminder',
+        urgency: 'immediate',
+        headline: 'Drink water soon',
+        destinations: ['character'],
+      },
+    })
+
+    const streamOptions = mockStream.mock.calls[0]?.[3]
+    expect(streamOptions.supportsTools).toBe(false)
+    expect(streamOptions.waitForTools).toBe(false)
+    expect(onDelta).toBeCalled()
+    expect(onEnd).toBeCalled()
+    store.dispose()
+  })
+
+  it('suppresses managed proactive companion events when governance says no', async () => {
+    let sparkNotifyListener: ((event: WebSocketEventOf<'spark:notify'>) => Promise<void>) | undefined
+    mockedStore(useModsServerChannelStore).onEvent = vi.fn((type: string, callback: unknown) => {
+      if (type === 'spark:notify') {
+        sparkNotifyListener = callback as (event: WebSocketEventOf<'spark:notify'>) => Promise<void>
+      }
+
+      return () => {}
+    })
+
+    const proactiveStore = useProactiveCompanionStore()
+    const runtimeSnapshot = {
+      settings: {
+        enabled: true,
+        globalCooldownMs: 180000,
+        topicCooldownMs: 600000,
+        intensity: 'low' as const,
+      },
+      state: 'ready' as const,
+      summary: 'ready',
+      sidecarConnected: true,
+      sidecarSummary: 'ready',
+      recentDecisions: [],
+      refreshedAt: 2,
+    }
+    proactiveStore.setBridge({
+      loadConfig: async () => ({
+        enabled: true,
+        globalCooldownMs: 180000,
+        topicCooldownMs: 600000,
+        intensity: 'low',
+      }),
+      saveConfig: async settings => settings,
+      getRuntimeSnapshot: async () => runtimeSnapshot,
+      refreshRuntime: async () => runtimeSnapshot,
+      clearHistory: async () => runtimeSnapshot,
+      recordContextUpdate: async () => runtimeSnapshot,
+      evaluateSparkNotify: async () => ({
+        managed: true,
+        decision: {
+          event: {
+            id: 'sidecar-2',
+            source: 'plugin:local.proactive-companion',
+            kind: 'reminder',
+            headline: 'Repeat reminder',
+            topicKey: 'repeat reminder',
+            destinations: ['character'],
+            receivedAt: 1,
+          },
+          decision: 'suppressed',
+          reason: 'cooldown',
+          presentation: 'silent',
+          matchedSource: true,
+          sidecarReady: true,
+          decidedAt: 2,
+        },
+        runtime: runtimeSnapshot,
+      }),
+    })
+
+    const mockStream = vi.fn()
+    mockedStore(useLLM).stream = mockStream
+
+    const store = useCharacterOrchestratorStore()
+    store.initialize()
+
+    await sparkNotifyListener?.({
+      type: 'spark:notify',
+      source: 'plugin:local.proactive-companion',
+      data: {
+        id: 'sidecar-2',
+        eventId: 'sidecar-2',
+        kind: 'reminder',
+        urgency: 'soon',
+        headline: 'Repeat reminder',
+        destinations: ['character'],
+      },
+    })
+
+    expect(mockStream).not.toBeCalled()
+    store.dispose()
   })
 })

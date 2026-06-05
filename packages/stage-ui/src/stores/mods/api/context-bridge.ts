@@ -27,17 +27,91 @@ import { useConsciousnessStore } from '../../modules/consciousness'
 import { useProvidersStore } from '../../providers'
 import { useModsServerChannelStore } from './channel-server'
 
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  if (Object.prototype.toString.call(value) !== '[object Object]') {
+    return false
+  }
+
+  const prototype = Object.getPrototypeOf(value)
+  return prototype === Object.prototype || prototype === null
+}
+
+function sanitizeForBridge(value: unknown, seen = new WeakSet<object>()): unknown {
+  if (value == null) {
+    return value
+  }
+
+  const rawValue = typeof value === 'object' ? toRaw(value as object) : value
+  const valueType = typeof rawValue
+
+  if (valueType === 'string' || valueType === 'number' || valueType === 'boolean') {
+    return rawValue
+  }
+
+  if (valueType === 'undefined' || valueType === 'function' || valueType === 'symbol' || valueType === 'bigint') {
+    return undefined
+  }
+
+  if (Array.isArray(rawValue)) {
+    return rawValue
+      .map(item => sanitizeForBridge(item, seen))
+      .filter(item => item !== undefined)
+  }
+
+  if (valueType !== 'object') {
+    return undefined
+  }
+
+  if (!rawValue || typeof rawValue !== 'object') {
+    return undefined
+  }
+
+  const objectValue = rawValue as Record<string, unknown>
+  const globalWindow: unknown = typeof window !== 'undefined' ? window : undefined
+  const globalDocument: unknown = typeof document !== 'undefined' ? document : undefined
+
+  if (
+    rawValue === globalWindow
+    || rawValue === globalDocument
+    || 'nodeType' in objectValue
+    || 'ownerDocument' in objectValue
+    || 'nodeName' in objectValue
+    || (typeof Event !== 'undefined' && objectValue instanceof Event)
+    || (typeof Request !== 'undefined' && objectValue instanceof Request)
+    || (typeof Response !== 'undefined' && objectValue instanceof Response)
+    || (typeof File !== 'undefined' && objectValue instanceof File)
+    || (typeof Blob !== 'undefined' && objectValue instanceof Blob)
+  ) {
+    return undefined
+  }
+
+  if (seen.has(objectValue)) {
+    return undefined
+  }
+
+  if (!isPlainObject(objectValue)) {
+    return undefined
+  }
+
+  seen.add(objectValue)
+
+  const sanitizedEntries = Object.entries(objectValue)
+    .map(([key, nestedValue]) => [key, sanitizeForBridge(nestedValue, seen)] as const)
+    .filter(([, nestedValue]) => nestedValue !== undefined)
+
+  seen.delete(objectValue)
+
+  return Object.fromEntries(sanitizedEntries)
+}
+
 export function normalizeContextSnapshot<C extends Pick<ChatStreamEventContext, 'contexts'>>(contexts: C): C {
+  const sanitizedContexts = sanitizeForBridge(toRaw(contexts.contexts))
+
   return {
     ...contexts,
-    contexts: Object.fromEntries(
-      Object
-        .entries(toRaw(contexts.contexts))
-        .map(([key, ctx]) => [
-          key,
-          ctx.map(c => toRaw(c)),
-        ]),
-    ),
+    contexts: isPlainObject(sanitizedContexts)
+      ? sanitizedContexts as C['contexts']
+      : {} as C['contexts'],
   }
 }
 

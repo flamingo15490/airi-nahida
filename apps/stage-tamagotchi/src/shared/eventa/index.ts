@@ -22,6 +22,39 @@ import type {
   VrmUpdateFrameTracePayload,
 } from '@proj-airi/stage-ui-three/trace'
 
+import type {
+  CompanionCoordinationRefreshRequest,
+  CompanionCoordinationSnapshot,
+  CompanionCoordinationSparkNotifyResult,
+} from '../companion-coordination'
+import type {
+  ExternalIntegrationConfig,
+  ExternalIntegrationImportResult,
+  ExternalIntegrationKind,
+  ExternalIntegrationSnapshot,
+} from '../external-integrations'
+import type {
+  ExternalMemoryContextSnapshot,
+  ExternalMemoryJudgementSnapshot,
+  ExternalMemoryLoadRequest,
+  ExternalMemoryObservationRecord,
+  ExternalMemoryUsageSnapshot,
+  ExternalMemoryWriteRequest,
+  ExternalMemoryWriteResult,
+} from '../external-memory'
+import type { NahidaPersonaSettings } from '../nahida-persona'
+import type {
+  ProactiveCompanionContextUpdateInput,
+  ProactiveCompanionEvaluateResult,
+  ProactiveCompanionRuntimeSnapshot,
+  ProactiveCompanionSettings,
+  ProactiveCompanionSparkNotifyInput,
+} from '../proactive-companion'
+import type {
+  StartupDiagnosticsResult,
+  SystemHealthSnapshot,
+} from '../system-health'
+
 import { defineEventa, defineInvokeEventa } from '@moeru/eventa'
 
 export const electronStartTrackMousePosition = defineInvokeEventa('eventa:invoke:electron:start-tracking-mouse-position')
@@ -42,6 +75,40 @@ export interface ElectronServerChannelConfig {
 export const electronGetServerChannelConfig = defineInvokeEventa<ElectronServerChannelConfig>('eventa:invoke:electron:server-channel:get-config')
 export const electronApplyServerChannelConfig = defineInvokeEventa<ElectronServerChannelConfig, Partial<ElectronServerChannelConfig>>('eventa:invoke:electron:server-channel:apply-config')
 export const electronGetServerChannelQrPayload = defineInvokeEventa<ServerChannelQrPayload>('eventa:invoke:electron:server-channel:get-qr-payload')
+
+export const electronExternalIntegrationsGetSnapshots = defineInvokeEventa<ExternalIntegrationSnapshot[]>('eventa:invoke:electron:external-integrations:get-snapshots')
+export const electronExternalIntegrationsSaveConfig = defineInvokeEventa<ExternalIntegrationSnapshot, ExternalIntegrationConfig>('eventa:invoke:electron:external-integrations:save-config')
+export const electronExternalIntegrationsProbeNow = defineInvokeEventa<ExternalIntegrationSnapshot, { kind: ExternalIntegrationKind }>('eventa:invoke:electron:external-integrations:probe-now')
+export const electronExternalIntegrationsImportLegacyMcp = defineInvokeEventa<ExternalIntegrationImportResult>('eventa:invoke:electron:external-integrations:import-legacy-mcp')
+export const electronExternalMemoryLoadContext = defineInvokeEventa<ExternalMemoryContextSnapshot, ExternalMemoryLoadRequest | undefined>('eventa:invoke:electron:external-memory:load-context')
+export const electronExternalMemoryRefreshContext = defineInvokeEventa<ExternalMemoryContextSnapshot, ExternalMemoryLoadRequest | undefined>('eventa:invoke:electron:external-memory:refresh-context')
+export const electronExternalMemoryGetLastUsage = defineInvokeEventa<ExternalMemoryUsageSnapshot>('eventa:invoke:electron:external-memory:get-last-usage')
+export const electronExternalMemoryRecordMemoryObservation = defineInvokeEventa<ExternalMemoryJudgementSnapshot, ExternalMemoryObservationRecord>('eventa:invoke:electron:external-memory:record-memory-observation')
+export const electronExternalMemoryRefreshMemoryJudgement = defineInvokeEventa<ExternalMemoryJudgementSnapshot>('eventa:invoke:electron:external-memory:refresh-memory-judgement')
+export const electronExternalMemoryGetMemoryJudgementSnapshot = defineInvokeEventa<ExternalMemoryJudgementSnapshot>('eventa:invoke:electron:external-memory:get-memory-judgement-snapshot')
+export const electronExternalMemoryClearMemoryCandidateLedger = defineInvokeEventa<ExternalMemoryJudgementSnapshot>('eventa:invoke:electron:external-memory:clear-memory-candidate-ledger')
+export const electronExternalMemoryClearWriteCandidateHistory = defineInvokeEventa<ExternalMemoryUsageSnapshot>('eventa:invoke:electron:external-memory:clear-write-candidate-history')
+export const electronExternalMemoryWriteRecentSummary = defineInvokeEventa<ExternalMemoryWriteResult, ExternalMemoryWriteRequest>('eventa:invoke:electron:external-memory:write-recent-summary')
+export const electronExternalMemoryWriteFollowUpItems = defineInvokeEventa<ExternalMemoryWriteResult, ExternalMemoryWriteRequest>('eventa:invoke:electron:external-memory:write-follow-up-items')
+export const electronExternalMemoryWriteUserProfilePatch = defineInvokeEventa<ExternalMemoryWriteResult, ExternalMemoryWriteRequest>('eventa:invoke:electron:external-memory:write-user-profile-patch')
+export const electronExternalMemoryWritePreferencesPatch = defineInvokeEventa<ExternalMemoryWriteResult, ExternalMemoryWriteRequest>('eventa:invoke:electron:external-memory:write-preferences-patch')
+export const electronProactiveCompanionLoadConfig = defineInvokeEventa<ProactiveCompanionSettings>('eventa:invoke:electron:proactive-companion:load-config')
+export const electronProactiveCompanionSaveConfig = defineInvokeEventa<ProactiveCompanionSettings, ProactiveCompanionSettings>('eventa:invoke:electron:proactive-companion:save-config')
+export const electronProactiveCompanionGetRuntimeSnapshot = defineInvokeEventa<ProactiveCompanionRuntimeSnapshot>('eventa:invoke:electron:proactive-companion:get-runtime-snapshot')
+export const electronProactiveCompanionRefreshRuntime = defineInvokeEventa<ProactiveCompanionRuntimeSnapshot>('eventa:invoke:electron:proactive-companion:refresh-runtime')
+export const electronProactiveCompanionClearHistory = defineInvokeEventa<ProactiveCompanionRuntimeSnapshot>('eventa:invoke:electron:proactive-companion:clear-history')
+export const electronProactiveCompanionEvaluateSparkNotify = defineInvokeEventa<ProactiveCompanionEvaluateResult, ProactiveCompanionSparkNotifyInput>('eventa:invoke:electron:proactive-companion:evaluate-spark-notify')
+export const electronProactiveCompanionRecordContextUpdate = defineInvokeEventa<ProactiveCompanionRuntimeSnapshot, ProactiveCompanionContextUpdateInput>('eventa:invoke:electron:proactive-companion:record-context-update')
+export const electronNahidaPersonaGetConfig = defineInvokeEventa<NahidaPersonaSettings>('eventa:invoke:electron:nahida-persona:get-config')
+export const electronNahidaPersonaSaveConfig = defineInvokeEventa<NahidaPersonaSettings, NahidaPersonaSettings>('eventa:invoke:electron:nahida-persona:save-config')
+export const electronCompanionCoordinationGetSnapshot = defineInvokeEventa<CompanionCoordinationSnapshot, CompanionCoordinationRefreshRequest | undefined>('eventa:invoke:electron:companion-coordination:get-snapshot')
+export const electronCompanionCoordinationRefresh = defineInvokeEventa<CompanionCoordinationSnapshot, CompanionCoordinationRefreshRequest | undefined>('eventa:invoke:electron:companion-coordination:refresh')
+export const electronCompanionCoordinationClearHistory = defineInvokeEventa<CompanionCoordinationSnapshot, CompanionCoordinationRefreshRequest | undefined>('eventa:invoke:electron:companion-coordination:clear-history')
+export const electronCompanionCoordinationRefreshForSparkNotify = defineInvokeEventa<CompanionCoordinationSparkNotifyResult, CompanionCoordinationRefreshRequest | undefined>('eventa:invoke:electron:companion-coordination:refresh-for-spark-notify')
+
+export const electronSystemHealthGetSnapshot = defineInvokeEventa<SystemHealthSnapshot>('eventa:invoke:electron:system-health:get-snapshot')
+export const electronSystemHealthRefresh = defineInvokeEventa<SystemHealthSnapshot>('eventa:invoke:electron:system-health:refresh')
+export const electronSystemHealthRunStartupDiagnostics = defineInvokeEventa<StartupDiagnosticsResult>('eventa:invoke:electron:system-health:run-startup-diagnostics')
 
 export type ElectronUpdaterChannel = 'latest' | 'stable' | 'alpha' | 'beta' | 'nightly' | 'canary'
 
@@ -294,6 +361,10 @@ export const electronWindowLifecycleChanged = defineEventa<ElectronWindowLifecyc
 export const electronGetWindowLifecycleState = defineInvokeEventa<ElectronWindowLifecycleState>('eventa:invoke:electron:window:get-lifecycle-state')
 export const electronWindowSetAlwaysOnTop = defineInvokeEventa<void, boolean>('eventa:invoke:electron:window:set-always-on-top')
 export const electronAppOpenUserDataFolder = defineInvokeEventa<{ path: string }>('eventa:invoke:electron:app:open-user-data-folder')
+export interface ElectronLegacyFileOriginStorageSnapshot {
+  values: Record<string, string>
+}
+export const electronAppReadLegacyFileOriginStorage = defineInvokeEventa<ElectronLegacyFileOriginStorageSnapshot, { keys: string[] }>('eventa:invoke:electron:app:read-legacy-file-origin-storage')
 export const electronAppQuit = defineInvokeEventa<void>('eventa:invoke:electron:app:quit')
 
 export type ElectronGodotStageState = 'stopped' | 'starting' | 'running' | 'stopping' | 'error'

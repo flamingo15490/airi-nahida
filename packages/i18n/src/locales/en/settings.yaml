@@ -407,8 +407,56 @@ pages:
     upload: Upload
     upload_desc: Click or drag file to upload
   memory:
-    description: Where memories got stored, and organized
+    description: Review how AIRI reads, uses, and writes back trusted external memory.
     title: Memory
+    error-title: External memory error
+    panel:
+      title: External memory runtime
+      description: AIRI reads trusted snippets from the external memory root, uses them as prompt supplements, and performs limited controlled write-back.
+    actions:
+      refresh: Refresh memory context
+      write-summary: Write recent summary
+      write-summary-empty: No active chat summary could be generated yet.
+    status:
+      active-character: Active character
+      summary: Current summary
+      last-read: Last read
+      reply-uses-memory: Current replies may use external memory
+      nahida-constraint: Nahida memory-expression layer active
+      nahida-summary: Nahida layer summary
+      yes: Yes
+      no: No
+      none: None
+      never: Never
+      ready: Ready
+      unavailable: Unavailable
+      states:
+        ready: Ready
+        degraded: Degraded
+        disabled: Disabled
+        unavailable: Unavailable
+    documents:
+      empty: No usable snippets were found in this document yet.
+      user-profile:
+        title: User profile
+      preferences:
+        title: Preferences
+      follow-ups:
+        title: Follow-ups
+      recent-summary:
+        title: Recent summary
+      character-knowledge:
+        title: Character knowledge
+    recent-writes:
+      title: Recent write-back
+      description: Controlled writes stay visible here so you can verify what AIRI changed in the external memory root.
+      empty: No controlled write-back has happened in this runtime yet.
+      last-kind: Latest target
+      last-time: Latest write
+      last-summary: Latest result
+    guardrails:
+      title: Guardrails
+      description: This page never exposes raw filesystem access to renderer code. When memory becomes unavailable, AIRI should degrade gracefully instead of pretending to remember.
   data:
     title: Data
     description: Manage stored AIRI data, exports, and resets
@@ -1462,6 +1510,189 @@ pages:
       errors:
         title: QR scan failed
         failed: Failed to scan or connect with the QR code.
+  integrations:
+    title: Local Integrations
+    description: Review and stabilize the current memory and companion-sidecar collaboration setup.
+    error-title: External integration error
+    actions:
+      save-memory: Save memory config
+      probe-memory: Probe memory
+      save-sidecar: Save sidecar config
+      probe-sidecar: Probe sidecar
+      open-data-folder: Open AIRI data folder
+      import-legacy-mcp: Import current AIRI MCP config
+    compatibility:
+      title: Compatibility boundary
+      description: GPT-SoVITS, TTS adapter, ComfyUI, vision, and context bridge stay on their current paths in this phase. This page only stabilizes memory and companion-sidecar coordination.
+    import:
+      title: Import from current AIRI desktop profile
+      description: Use this when the source build did not automatically pick up your real local MCP bridge. AIRI will read `mcp.json` and `server-channel-config.json` from the current desktop AIRI profile and copy them into this source-build profile.
+      source-profile: Imported from
+      target-profile: Applied to
+    fields:
+      enabled:
+        label: Enable this integration
+        description: Keep the integration visible to AIRI and include it in manual health checks.
+    status:
+      summary: Summary
+      pending: Waiting for the first probe.
+      last-checked: Last checked
+      last-success: Last success
+      last-error: Last error
+      never: Never
+      boolean:
+        true: Yes
+        false: No
+      states:
+        ready: Ready
+        degraded: Degraded
+        disabled: Disabled
+        not-configured: Not configured
+        unknown: Unknown
+    details:
+      mcpConfigPath: MCP config path
+      configuredRootPath: MCP root path
+      rootPathExists: Root path exists
+      rootPathIsDirectory: Root path is directory
+      filesystemRuntimeState: Filesystem server runtime
+      obsidianConfigured: Obsidian bridge configured
+      obsidianRuntimeState: Obsidian bridge runtime
+      moduleName: Sidecar module name
+      pluginId: Sidecar plugin ID
+      expectedWsUrl: Expected AIRI websocket URL
+      currentWsUrl: Current AIRI websocket URL
+      connectedModules: Connected AIRI modules
+      authenticated: Authenticated
+      healthy: Healthy
+      lastHeartbeatAt: Last heartbeat
+    memory:
+      title: Memory
+      description: Freeze the current MCP-backed memory bridge into one stable desktop integration entry.
+      fields:
+        root-path:
+          label: Memory root path
+          description: This should match the real external memory directory that AIRI already uses.
+        filesystem-server:
+          label: Filesystem MCP server name
+          description: AIRI checks this MCP server to confirm the memory bridge is still aligned.
+        obsidian-server:
+          label: Obsidian bridge server name
+          description: Leave empty if your current memory workflow does not use the Obsidian bridge.
+    sidecar:
+      title: Companion sidecar
+      description: Keep the existing sidecar external, but let AIRI recognize whether the real companion module is connected to the current server channel.
+      fields:
+        enabled-description: Enable this after you confirm the current external sidecar should keep collaborating with AIRI.
+        module-name:
+          label: Module name
+          description: Match the `module_name` announced by your current sidecar.
+        plugin-id:
+          label: Plugin ID
+          description: Match the `plugin_id` announced by your current sidecar.
+        expected-ws-url:
+          label: Expected AIRI websocket URL
+          description: Optional cross-check for the AIRI websocket address your sidecar expects to connect to.
+  nahida-persona:
+    title: Nahida Persona
+    description: Add a Nahida-specific expression layer on top of the current active card without rewriting the card itself.
+    error-title: Nahida persona error
+    panel:
+      title: Nahida expression layer
+      description: This layer only activates when the current active card name matches Nahida / 纳西妲.
+    actions:
+      save: Save persona settings
+    fields:
+      enabled:
+        label: Enable Nahida persona layer
+        description: Keep the active card as the base, then add a Nahida-only voice and memory-expression supplement.
+      mode:
+        label: Memory and initiative mode
+        description: Choose how strongly Nahida should continue context, care, and memory expression.
+    modes:
+      reserved:
+        label: Reserved
+        description: Light memory reference only when context is explicit. No strong familiarity.
+      balanced:
+        label: Balanced
+        description: Natural continuity and gentle familiarity. Best default.
+      active:
+        label: Active
+        description: More proactive warmth, check-ins, and memory continuity, without fabricating history.
+    status:
+      active-card: Active card
+      matches: Matches Nahida card
+      active: Persona layer active
+      summary: Current summary
+      yes: Yes
+      no: No
+      none: None
+    guardrails:
+      title: Guardrails
+      description: This layer only changes expression. It must not fabricate memory, override the base card, or turn ordinary chat into lore exposition.
+  proactive-companion:
+    title: Proactive Companion
+    description: Govern incoming companion sidecar reminders with conservative desktop-only rules before they reach AIRI's shared spark runtime.
+    error-title: Proactive companion error
+    panel:
+      title: Companion reminder governance
+      description: Keep proactive reminders visible and controllable without letting the sidecar interrupt normal chat by default.
+    actions:
+      save: Save proactive settings
+      refresh: Refresh runtime
+      clear-history: Clear recent history
+    fields:
+      enabled:
+        label: Enable proactive companion delivery
+        description: Let approved sidecar reminders reach AIRI as restrained spark reactions.
+      global-cooldown:
+        label: Global cooldown (seconds)
+        description: Minimum gap between any two delivered proactive reminders.
+      topic-cooldown:
+        label: Similar-topic cooldown (seconds)
+        description: Suppress repeated reminders that look like the same topic.
+      intensity:
+        label: Base intensity
+        description: Choose how assertive the reminder presentation should feel.
+    intensity:
+      low:
+        label: Low
+        description: Prefer quiet, low-frequency reminders.
+      balanced:
+        label: Balanced
+        description: Slightly more visible reminders while staying restrained.
+    status:
+      states:
+        ready: Ready
+        degraded: Degraded
+        disabled: Disabled
+        unavailable: Unavailable
+      sidecar: Sidecar connection
+      connected: Connected
+      disconnected: Disconnected
+      summary: Runtime summary
+      sidecar-summary: Sidecar summary
+      last-refresh: Last refresh
+      last-failure: Last failure
+      never: Never
+      none: None
+    history:
+      title: Recent proactive events
+      description: Review which companion reminders were delivered, suppressed, or dropped.
+      latest-headline: Latest event
+      latest-time: Latest decision time
+      latest-presentation: Latest presentation
+      latest-reason: Latest reason
+      reason: Reason
+      time: Time
+      empty: No proactive companion events have been recorded yet.
+      decisions:
+        delivered: Delivered
+        suppressed: Suppressed
+        deferred: Deferred
+        dropped: Dropped
+    guardrails:
+      title: Guardrails
+      description: Ordinary companion events should stay brief and non-disruptive, repeated reminders should cool down, and degraded sidecar states should fail quietly.
   system:
     color-scheme:
       description: Change the color scheme of the stage.
@@ -1472,6 +1703,86 @@ pages:
     general:
       description: Dark theme, languages, etc.
       title: General
+    health:
+      title: System Health
+      description: Review the unified desktop health snapshot, subsystem status, and startup diagnostics.
+      error-title: System health error
+      actions:
+        refresh: Refresh snapshot
+        run-diagnostics: Run startup diagnostics
+        view-details: View details
+        ignore-alert: Ignore
+        open-related-settings: Open related settings
+      loading:
+        title: Loading health snapshot
+        description: AIRI is fetching the latest system health from the desktop runtime.
+      overview:
+        title: Unified health snapshot
+        description: This view mirrors the main-process health contract without re-deriving the overall status in the renderer.
+        overall-label: Overall status
+        checked-at-label: Snapshot checked at
+        subsystems-label: Tracked subsystems
+        subsystems-count: '{count} subsystems reported'
+      startup-phase:
+        in-progress: Startup phase in progress
+        completed: Startup phase completed
+      startup-alert:
+        title: Startup diagnostics found issues
+        description: Startup diagnostics found {count} issues. Open System Health to review the failures.
+      quick-summary:
+        loading: AIRI is loading the latest system health snapshot for this settings view.
+        startup: Startup diagnostics are still running for this desktop session.
+        healthy: All tracked desktop subsystems look healthy right now.
+        degraded: Some tracked desktop subsystems need attention, but AIRI is still running.
+        unhealthy: Startup diagnostics or live probes found failures that need attention.
+        unknown: System health has not gathered enough signals yet.
+      status:
+        healthy: Healthy
+        degraded: Degraded
+        unhealthy: Unhealthy
+        unknown: Unknown
+      fields:
+        summary: Summary
+        detail: Detail
+        action-hint: Suggested action
+        checked-at: Checked at
+      empty:
+        subsystems: No subsystem probes have been reported yet.
+        timestamp: Not available yet
+      subsystems-panel:
+        title: Subsystem probes
+        description: Each subsystem entry comes directly from the frozen shared health probe contract.
+      diagnostics:
+        title: Startup diagnostics
+        description: Run the frozen startup diagnostics sequence and inspect warnings, failures, and total duration.
+        idle: Not run yet
+        passed: Passed
+        failed: Failed
+        duration: Duration
+        warnings-title: '{count} warnings'
+        failures-title: '{count} failures'
+        no-warnings: No warnings were reported in the latest startup diagnostics run.
+        no-failures: No failures were reported in the latest startup diagnostics run.
+        empty: Startup diagnostics have not been run in this renderer session yet.
+      subsystems:
+        memory:
+          title: Memory
+          description: External memory bridge and persistence health.
+        persona:
+          title: Persona
+          description: Persona expression layer readiness and consistency.
+        proactive:
+          title: Proactive Companion
+          description: Proactive governance and reminder delivery health.
+        coordination:
+          title: Coordination
+          description: Cross-surface coordination state between shared runtime modules.
+        integrations:
+          title: Integrations
+          description: External bridge and module integration readiness.
+        vision:
+          title: Vision
+          description: Vision capture, runner, and analysis subsystem state.
     description: Customize your stage!
     sections:
       section:

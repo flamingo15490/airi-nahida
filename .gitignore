@@ -136,3 +136,6 @@ apps/stage-tamagotchi/electron.vite.config.*.mjs
 .obsidian/
 
 docs/ai/context/verifications/
+
+# Local project-doc safety backups created during staged Chinese copy cleanup.
+project-docs/_temp-backups/

@@ -213,6 +213,24 @@ export interface AppOptions {
 }
 
 /**
+ * Snapshot of one currently connected AIRI websocket module.
+ */
+export interface ServerRuntimeModuleSnapshot {
+  /** Module display name announced over `module:announce`. */
+  name: string
+  /** Optional stable index for multi-instance modules. */
+  index?: number
+  /** Authenticated identity announced by the peer. */
+  identity: MetadataEventSource
+  /** Whether the runtime currently considers the peer authenticated. */
+  authenticated: boolean
+  /** Whether the peer is currently considered healthy by heartbeat checks. */
+  healthy: boolean
+  /** Last heartbeat or other activity timestamp seen from this peer. */
+  lastHeartbeatAt?: number
+}
+
+/**
  * Normalizes logger settings from explicit options and environment variables.
  *
  * Use when:
@@ -267,7 +285,12 @@ export function normalizeLoggerConfig(options?: AppOptions) {
  * - Owns all timers and intervals created during setup
  * - Consumer orchestrator state is isolated within this function scope
  */
-export function setupApp(options?: AppOptions): { app: H3, closeAllPeers: () => void, dispose: () => void } {
+export function setupApp(options?: AppOptions): {
+  app: H3
+  closeAllPeers: () => void
+  dispose: () => void
+  getModuleSnapshot: () => ServerRuntimeModuleSnapshot[]
+} {
   // === Configuration & State Initialization ===
   const instanceId = options?.instanceId || optionOrEnv(undefined, 'SERVER_INSTANCE_ID', nanoid())
   const authToken = optionOrEnv(options?.auth?.token, 'AUTHENTICATION_TOKEN', '')
@@ -479,6 +502,21 @@ export function setupApp(options?: AppOptions): { app: H3, closeAllPeers: () => 
         name: peerInfo.name,
         index: peerInfo.index,
         identity: peerInfo.identity!,
+      }))
+  }
+
+  function getModuleSnapshot(): ServerRuntimeModuleSnapshot[] {
+    return Array.from(peers.values())
+      .filter((peerInfo): peerInfo is AuthenticatedPeer & { identity: MetadataEventSource, name: string } => {
+        return Boolean(peerInfo.name && peerInfo.identity)
+      })
+      .map(peerInfo => ({
+        name: peerInfo.name,
+        index: peerInfo.index,
+        identity: peerInfo.identity,
+        authenticated: peerInfo.authenticated,
+        healthy: peerInfo.healthy !== false,
+        lastHeartbeatAt: peerInfo.lastHeartbeatAt,
       }))
   }
 
@@ -983,5 +1021,6 @@ export function setupApp(options?: AppOptions): { app: H3, closeAllPeers: () => 
     app,
     closeAllPeers,
     dispose,
+    getModuleSnapshot,
   }
 }

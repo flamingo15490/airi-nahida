@@ -1413,6 +1413,86 @@ pages:
     general:
       description: 深色主題、語言等選項
       title: 通用
+    health:
+      title: 系統健康
+      description: 查看統一的桌面端健康快照、各子系統狀態與啟動診斷結果。
+      error-title: 系統健康錯誤
+      actions:
+        refresh: 重新整理快照
+        run-diagnostics: 執行啟動診斷
+        view-details: 查看詳情
+        ignore-alert: 忽略
+        open-related-settings: 前往相關設定
+      loading:
+        title: 正在載入健康快照
+        description: AIRI 正在從桌面執行階段取得最新的 system health 資料。
+      overview:
+        title: 統一健康快照
+        description: 此頁面直接顯示主行程回傳的健康契約，不會在 renderer 重新推導 overall 狀態。
+        overall-label: 整體狀態
+        checked-at-label: 快照檢查時間
+        subsystems-label: 已追蹤子系統
+        subsystems-count: '已回報 {count} 個子系統'
+      startup-phase:
+        in-progress: 啟動階段進行中
+        completed: 啟動階段已完成
+      startup-alert:
+        title: 啟動診斷發現問題
+        description: 啟動診斷發現了 {count} 個問題，請打開系統健康查看失敗詳情。
+      quick-summary:
+        loading: AIRI 正在為目前設定頁載入最新的 system health 快照。
+        startup: 目前桌面工作階段的啟動診斷仍在進行中。
+        healthy: 目前所有已追蹤的桌面子系統狀態都正常。
+        degraded: 有部分桌面子系統需要關注，但 AIRI 仍可繼續運作。
+        unhealthy: 啟動診斷或即時探針發現了需要盡快處理的失敗項目。
+        unknown: system health 還沒有收集到足夠的狀態訊號。
+      status:
+        healthy: 健康
+        degraded: 降級
+        unhealthy: 不健康
+        unknown: 未知
+      fields:
+        summary: 摘要
+        detail: 詳情
+        action-hint: 建議動作
+        checked-at: 檢查時間
+      empty:
+        subsystems: 目前還沒有任何子系統探針結果。
+        timestamp: 暫無
+      subsystems-panel:
+        title: 子系統探針
+        description: 每條子系統資訊都直接來自凍結後的共享健康探針契約。
+      diagnostics:
+        title: 啟動診斷
+        description: 執行凍結後的啟動診斷流程，並查看 warnings、failures 與總耗時。
+        idle: 尚未執行
+        passed: 通過
+        failed: 失敗
+        duration: 耗時
+        warnings-title: '{count} 條警告'
+        failures-title: '{count} 條失敗'
+        no-warnings: 最近一次啟動診斷沒有回報任何警告。
+        no-failures: 最近一次啟動診斷沒有回報任何失敗。
+        empty: 目前 renderer 工作階段中尚未執行啟動診斷。
+      subsystems:
+        memory:
+          title: Memory
+          description: 外部記憶橋接與持久化健康狀態。
+        persona:
+          title: Persona
+          description: Persona 表達層的就緒度與一致性。
+        proactive:
+          title: Proactive Companion
+          description: 主動提醒治理與投遞鏈路健康狀態。
+        coordination:
+          title: Coordination
+          description: 共享執行階段模組之間的跨表面協調狀態。
+        integrations:
+          title: Integrations
+          description: 外部橋接與模組整合的就緒狀態。
+        vision:
+          title: Vision
+          description: 視覺擷取、runner 與分析子系統狀態。
     description: 自訂你的舞台外觀！
     sections:
       section:

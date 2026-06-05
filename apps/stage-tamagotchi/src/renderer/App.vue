@@ -8,27 +8,58 @@ import { useInferencePreload } from '@proj-airi/stage-ui/composables'
 import { useSharedAnalyticsStore } from '@proj-airi/stage-ui/stores/analytics'
 import { useCharacterOrchestratorStore } from '@proj-airi/stage-ui/stores/character'
 import { useChatSessionStore } from '@proj-airi/stage-ui/stores/chat/session-store'
+import { useCompanionCoordinationStore } from '@proj-airi/stage-ui/stores/companion-coordination-store'
 import { usePluginHostInspectorStore } from '@proj-airi/stage-ui/stores/devtools/plugin-host-debug'
 import { useDisplayModelsStore } from '@proj-airi/stage-ui/stores/display-models'
+import { useExternalMemoryStore } from '@proj-airi/stage-ui/stores/external-memory-store'
 import { useModsServerChannelStore } from '@proj-airi/stage-ui/stores/mods/api/channel-server'
 import { useContextBridgeStore } from '@proj-airi/stage-ui/stores/mods/api/context-bridge'
 import { useAiriCardStore } from '@proj-airi/stage-ui/stores/modules/airi-card'
 import { useArtistryStore } from '@proj-airi/stage-ui/stores/modules/artistry'
+import { useVisionStore } from '@proj-airi/stage-ui/stores/modules/vision'
+import { useNahidaPersonaStore } from '@proj-airi/stage-ui/stores/nahida-persona-store'
 import { usePerfTracerBridgeStore } from '@proj-airi/stage-ui/stores/perf-tracer-bridge'
 import { listProvidersForPluginHost, shouldPublishPluginHostCapabilities } from '@proj-airi/stage-ui/stores/plugin-host-capabilities'
+import { useProactiveCompanionStore } from '@proj-airi/stage-ui/stores/proactive-companion-store'
 import { useSettings, useSettingsAudioDevice } from '@proj-airi/stage-ui/stores/settings'
-import { useTheme } from '@proj-airi/ui'
+import { Button, useTheme } from '@proj-airi/ui'
 import { storeToRefs } from 'pinia'
-import { onMounted, onUnmounted, watch } from 'vue'
+import { computed, onMounted, onUnmounted, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { RouterView, useRoute, useRouter } from 'vue-router'
 import { toast, Toaster } from 'vue-sonner'
 
 import ResizeHandler from './components/ResizeHandler.vue'
 
 import {
+  electronCompanionCoordinationClearHistory,
+  electronCompanionCoordinationGetSnapshot,
+  electronCompanionCoordinationRefresh,
+  electronCompanionCoordinationRefreshForSparkNotify,
+  electronExternalMemoryClearMemoryCandidateLedger,
+  electronExternalMemoryClearWriteCandidateHistory,
+  electronExternalMemoryGetLastUsage,
+  electronExternalMemoryGetMemoryJudgementSnapshot,
+  electronExternalMemoryLoadContext,
+  electronExternalMemoryRecordMemoryObservation,
+  electronExternalMemoryRefreshContext,
+  electronExternalMemoryRefreshMemoryJudgement,
+  electronExternalMemoryWriteFollowUpItems,
+  electronExternalMemoryWritePreferencesPatch,
+  electronExternalMemoryWriteRecentSummary,
+  electronExternalMemoryWriteUserProfilePatch,
   electronGetServerChannelConfig,
   electronGodotStageGetStatus,
   electronGodotStageStatusChanged,
+  electronNahidaPersonaGetConfig,
+  electronNahidaPersonaSaveConfig,
+  electronProactiveCompanionClearHistory,
+  electronProactiveCompanionEvaluateSparkNotify,
+  electronProactiveCompanionGetRuntimeSnapshot,
+  electronProactiveCompanionLoadConfig,
+  electronProactiveCompanionRecordContextUpdate,
+  electronProactiveCompanionRefreshRuntime,
+  electronProactiveCompanionSaveConfig,
   electronSettingsNavigate,
   electronStartTrackMousePosition,
   i18nGetLocale,
@@ -51,18 +82,23 @@ import {
 import { initializeElectronAuthCallbackBridge } from './bridges/electron-auth-callback'
 import { initializeStageThreeRuntimeTraceBridge } from './bridges/stage-three-runtime-trace'
 import { useLanguage } from './composables/use-language'
+import { useVisionRunner } from './composables/use-vision-runner'
 import { createChatSyncWindowLifecycle } from './stores/chat-sync-lifecycle'
 import { useTamagotchiMcpToolsStore } from './stores/mcp-tools'
 import { useTamagotchiPluginToolsStore } from './stores/plugin-tools'
 import { useServerChannelSettingsStore } from './stores/settings/server-channel'
+import { useSystemHealthSettingsStore } from './stores/settings/system-health'
 import { useStageWindowLifecycleStore } from './stores/stage-window-lifecycle'
 
 const { isDark: dark } = useTheme()
+const { t } = useI18n()
 const contextBridgeStore = useContextBridgeStore()
 const displayModelsStore = useDisplayModelsStore()
 const settingsStore = useSettings()
 const { language, themeColorsHue, themeColorsHueDynamic } = storeToRefs(settingsStore)
 const serverChannelSettingsStore = useServerChannelSettingsStore()
+const systemHealthStore = useSystemHealthSettingsStore()
+const { shouldShowStartupAlert, startupDiagnosticsFailureCount } = storeToRefs(systemHealthStore)
 const router = useRouter()
 const route = useRoute()
 const cardStore = useAiriCardStore()
@@ -70,14 +106,21 @@ const chatSessionStore = useChatSessionStore()
 const serverChannelStore = useModsServerChannelStore()
 const characterOrchestratorStore = useCharacterOrchestratorStore()
 const analyticsStore = useSharedAnalyticsStore()
+const coordinationStore = useCompanionCoordinationStore()
 const inferencePreload = useInferencePreload()
 const pluginHostInspectorStore = usePluginHostInspectorStore()
+const nahidaPersonaStore = useNahidaPersonaStore()
+const externalMemoryStore = useExternalMemoryStore()
+const proactiveCompanionStore = useProactiveCompanionStore()
 const mcpToolsStore = useTamagotchiMcpToolsStore()
 const pluginToolsStore = useTamagotchiPluginToolsStore()
 const stageWindowLifecycleStore = useStageWindowLifecycleStore()
 const settingsAudioDeviceStore = useSettingsAudioDevice()
 const artistryStore = useArtistryStore()
+const visionStore = useVisionStore()
+const visionRunner = useVisionRunner()
 const { activeProvider, artistryGlobals, activeModel, defaultPromptPrefix, providerOptions } = storeToRefs(artistryStore)
+const { autoRun: visionAutoRun, configured: visionConfigured } = storeToRefs(visionStore)
 const context = useElectronEventaContext()
 usePerfTracerBridgeStore()
 initializeStageThreeRuntimeTraceBridge()
@@ -92,6 +135,31 @@ const loadPlugin = useElectronEventaInvoke(electronPluginLoad)
 const unloadPlugin = useElectronEventaInvoke(electronPluginUnload)
 const inspectPluginHost = useElectronEventaInvoke(electronPluginInspect)
 const startTrackingCursorPoint = useElectronEventaInvoke(electronStartTrackMousePosition)
+const getNahidaPersonaConfig = useElectronEventaInvoke(electronNahidaPersonaGetConfig)
+const saveNahidaPersonaConfig = useElectronEventaInvoke(electronNahidaPersonaSaveConfig)
+const loadExternalMemoryContext = useElectronEventaInvoke(electronExternalMemoryLoadContext)
+const refreshExternalMemoryContext = useElectronEventaInvoke(electronExternalMemoryRefreshContext)
+const getExternalMemoryUsage = useElectronEventaInvoke(electronExternalMemoryGetLastUsage)
+const recordExternalMemoryObservation = useElectronEventaInvoke(electronExternalMemoryRecordMemoryObservation)
+const refreshExternalMemoryJudgement = useElectronEventaInvoke(electronExternalMemoryRefreshMemoryJudgement)
+const getExternalMemoryJudgementSnapshot = useElectronEventaInvoke(electronExternalMemoryGetMemoryJudgementSnapshot)
+const clearExternalMemoryCandidateLedger = useElectronEventaInvoke(electronExternalMemoryClearMemoryCandidateLedger)
+const clearExternalMemoryWriteCandidateHistory = useElectronEventaInvoke(electronExternalMemoryClearWriteCandidateHistory)
+const writeExternalMemoryRecentSummary = useElectronEventaInvoke(electronExternalMemoryWriteRecentSummary)
+const writeExternalMemoryFollowUpItems = useElectronEventaInvoke(electronExternalMemoryWriteFollowUpItems)
+const writeExternalMemoryUserProfilePatch = useElectronEventaInvoke(electronExternalMemoryWriteUserProfilePatch)
+const writeExternalMemoryPreferencesPatch = useElectronEventaInvoke(electronExternalMemoryWritePreferencesPatch)
+const getCompanionCoordinationSnapshot = useElectronEventaInvoke(electronCompanionCoordinationGetSnapshot)
+const refreshCompanionCoordinationSnapshot = useElectronEventaInvoke(electronCompanionCoordinationRefresh)
+const clearCompanionCoordinationHistory = useElectronEventaInvoke(electronCompanionCoordinationClearHistory)
+const refreshCompanionCoordinationForSparkNotify = useElectronEventaInvoke(electronCompanionCoordinationRefreshForSparkNotify)
+const loadProactiveCompanionConfig = useElectronEventaInvoke(electronProactiveCompanionLoadConfig)
+const saveProactiveCompanionConfig = useElectronEventaInvoke(electronProactiveCompanionSaveConfig)
+const getProactiveCompanionRuntimeSnapshot = useElectronEventaInvoke(electronProactiveCompanionGetRuntimeSnapshot)
+const refreshProactiveCompanionRuntime = useElectronEventaInvoke(electronProactiveCompanionRefreshRuntime)
+const clearProactiveCompanionHistory = useElectronEventaInvoke(electronProactiveCompanionClearHistory)
+const evaluateProactiveCompanionSparkNotify = useElectronEventaInvoke(electronProactiveCompanionEvaluateSparkNotify)
+const recordProactiveCompanionContextUpdate = useElectronEventaInvoke(electronProactiveCompanionRecordContextUpdate)
 const reportPluginCapability = useElectronEventaInvoke(electronPluginUpdateCapability)
 const getMainLocale = useElectronEventaInvoke(i18nGetLocale)
 const setLocale = useElectronEventaInvoke(i18nSetLocale)
@@ -100,7 +168,65 @@ const syncArtistryConfig = useElectronEventaInvoke(artistrySyncConfig)
 const chatSyncLifecycle = createChatSyncWindowLifecycle(route.path)
 const isChatWindowRoute = () => route.path === '/chat'
 const isGodotStageRoute = () => route.path === '/' || route.path.startsWith('/settings')
+const isVisionOwnerRoute = () => route.path === '/'
 const isWidgetsWindowRoute = () => route.path === '/widgets'
+const showStartupDiagnosticsBanner = computed(() => {
+  return shouldShowStartupAlert.value && isGodotStageRoute() && !isWidgetsWindowRoute()
+})
+const startupDiagnosticsBannerMessage = computed(() => {
+  return t('settings.pages.system.health.startup-alert.description', {
+    count: startupDiagnosticsFailureCount.value,
+  })
+})
+
+async function recordProactiveCompanionContextUpdates(
+  updates: Array<Record<string, unknown>> | undefined,
+  parentEventId?: string,
+) {
+  if (!updates?.length) {
+    return
+  }
+
+  for (const [index, update] of updates.entries()) {
+    if (!update || typeof update !== 'object') {
+      continue
+    }
+
+    const metadata = 'metadata' in update && update.metadata && typeof update.metadata === 'object'
+      ? update.metadata as Record<string, unknown>
+      : undefined
+
+    if (metadata?.module !== 'proactive-companion') {
+      continue
+    }
+
+    try {
+      await proactiveCompanionStore.recordContextUpdate({
+        type: 'context:update',
+        metadata: parentEventId
+          ? {
+              event: {
+                id: `${parentEventId}:${index}`,
+                parentId: parentEventId,
+              },
+            }
+          : undefined,
+        data: {
+          id: typeof update.id === 'string' ? update.id : `proactive-context-update:${index}`,
+          contextId: typeof update.contextId === 'string' ? update.contextId : `proactive-context-update:${index}`,
+          strategy: update.strategy as never,
+          lane: typeof update.lane === 'string' ? update.lane : undefined,
+          text: typeof update.text === 'string' ? update.text : '',
+          destinations: Array.isArray(update.destinations) ? update.destinations as string[] : undefined,
+          metadata,
+        },
+      })
+    }
+    catch (error) {
+      console.warn('[App] Failed to record proactive companion context update from input:text:', error)
+    }
+  }
+}
 
 function syncGodotStageRenderer(state: { state: 'stopped' | 'starting' | 'running' | 'stopping' | 'error' }) {
   if (state.state === 'running') {
@@ -119,6 +245,28 @@ async function refreshPluginRuntimeTools() {
   catch (error) {
     console.warn('[App] Failed to refresh plugin runtime tools:', error)
   }
+}
+
+async function startBackgroundVisionIfEnabled() {
+  if (isChatWindowRoute() || isWidgetsWindowRoute() || !isVisionOwnerRoute() || !visionRunner.isOwnerWindow.value) {
+    return
+  }
+
+  await visionRunner.initializeSources()
+  if (!visionAutoRun.value || !visionConfigured.value || !visionRunner.hasPermissions.value || !visionRunner.activeSourceId.value) {
+    return
+  }
+
+  const started = await visionRunner.startCaptureLoop()
+  if (!started && visionRunner.errorMessage.value) {
+    console.warn('[App] Failed to auto-start vision runner:', visionRunner.errorMessage.value)
+  }
+}
+
+function openSystemHealthPage() {
+  void router.push('/settings/system/health').catch((error) => {
+    console.warn('[App] Failed to navigate to system health page:', error)
+  })
 }
 
 watch(() => route.path, () => {
@@ -152,6 +300,43 @@ pluginHostInspectorStore.setBridge({
   inspect: () => inspectPluginHost(),
 })
 
+nahidaPersonaStore.setBridge({
+  getConfig: () => getNahidaPersonaConfig(),
+  saveConfig: settings => saveNahidaPersonaConfig(settings),
+})
+
+externalMemoryStore.setBridge({
+  loadMemoryContext: request => loadExternalMemoryContext(request),
+  refreshMemoryContext: request => refreshExternalMemoryContext(request),
+  getLastMemoryUsage: () => getExternalMemoryUsage(),
+  recordMemoryObservation: request => recordExternalMemoryObservation(request),
+  refreshMemoryJudgement: () => refreshExternalMemoryJudgement(),
+  getMemoryJudgementSnapshot: () => getExternalMemoryJudgementSnapshot(),
+  clearMemoryCandidateLedger: () => clearExternalMemoryCandidateLedger(),
+  clearMemoryWriteCandidateHistory: () => clearExternalMemoryWriteCandidateHistory(),
+  writeRecentSummary: request => writeExternalMemoryRecentSummary(request),
+  writeFollowUpItems: request => writeExternalMemoryFollowUpItems(request),
+  writeUserProfilePatch: request => writeExternalMemoryUserProfilePatch(request),
+  writePreferencesPatch: request => writeExternalMemoryPreferencesPatch(request),
+})
+
+proactiveCompanionStore.setBridge({
+  loadConfig: () => loadProactiveCompanionConfig(),
+  saveConfig: settings => saveProactiveCompanionConfig(settings),
+  getRuntimeSnapshot: () => getProactiveCompanionRuntimeSnapshot(),
+  refreshRuntime: () => refreshProactiveCompanionRuntime(),
+  clearHistory: () => clearProactiveCompanionHistory(),
+  evaluateSparkNotify: event => evaluateProactiveCompanionSparkNotify(event),
+  recordContextUpdate: event => recordProactiveCompanionContextUpdate(event),
+})
+
+coordinationStore.setBridge({
+  getSnapshot: request => getCompanionCoordinationSnapshot(request),
+  refresh: request => refreshCompanionCoordinationSnapshot(request),
+  clearHistory: request => clearCompanionCoordinationHistory(request),
+  refreshForSparkNotify: request => refreshCompanionCoordinationForSparkNotify(request),
+})
+
 // NOTICE: Runtime tool stores must register during setup so renderer consumers can see them
 // before `onMounted()` finishes the rest of the startup flow.
 void mcpToolsStore.refresh().catch((error) => {
@@ -177,6 +362,11 @@ const { updateThemeColor } = useThemeColor(themeColorFromValue({ light: 'rgb(255
 watch(dark, () => updateThemeColor(), { immediate: true })
 watch(route, () => updateThemeColor(), { immediate: true })
 onMounted(() => updateThemeColor())
+onMounted(() => {
+  void proactiveCompanionStore.refreshConfig().catch(() => {})
+  void proactiveCompanionStore.refreshRuntime().catch(() => {})
+  void coordinationStore.getSnapshot().catch(() => {})
+})
 
 context.value.on(electronSettingsNavigate, (event) => {
   const targetRoute = event?.body?.route
@@ -200,6 +390,12 @@ context.value.on(electronGodotStageStatusChanged, (event) => {
 onMounted(async () => {
   chatSyncLifecycle.initialize()
 
+  if (isGodotStageRoute() && !isWidgetsWindowRoute()) {
+    void systemHealthStore.ensureStartupDiagnostics().catch((error) => {
+      console.warn('[App] Failed to run startup diagnostics automatically:', error)
+    })
+  }
+
   // NOTICE: Issue #1658
   // When Electron restarts, renderer localStorage may not be flushed to disk.
   // The store's onMounted hook falls back to navigator.language, which triggers
@@ -209,13 +405,25 @@ onMounted(async () => {
   await restoreLocale()
 
   analyticsStore.initialize()
+  await nahidaPersonaStore.refresh().catch((error) => {
+    console.warn('[App] Failed to refresh Nahida persona settings:', error)
+  })
   await displayModelsStore.initialize()
   cardStore.initialize()
+  await externalMemoryStore.refreshUsage().catch((error) => {
+    console.warn('[App] Failed to fetch external memory usage:', error)
+  })
 
   await chatSessionStore.initialize()
   await displayModelsStore.loadDisplayModelsFromIndexedDB()
   await settingsStore.initializeStageModel()
   await settingsAudioDeviceStore.initialize()
+  await externalMemoryStore.refreshContext().catch((error) => {
+    console.warn('[App] Failed to refresh external memory context:', error)
+  })
+  await coordinationStore.refresh().catch((error) => {
+    console.warn('[App] Failed to refresh coordination snapshot:', error)
+  })
 
   if (isGodotStageRoute()) {
     try {
@@ -235,6 +443,29 @@ onMounted(async () => {
     token: serverChannelConfig.authToken || undefined,
     possibleEvents: ['ui:configure'],
   }).catch(err => console.error('Failed to initialize Mods Server Channel in App.vue:', err))
+  serverChannelStore.onContextUpdate(async (event) => {
+    if (event.data.metadata?.module !== 'proactive-companion') {
+      return
+    }
+
+    try {
+      await proactiveCompanionStore.recordContextUpdate(event)
+    }
+    catch (error) {
+      console.warn('[App] Failed to record proactive companion context update:', error)
+    }
+  })
+  serverChannelStore.onEvent('input:text', async (event) => {
+    try {
+      await recordProactiveCompanionContextUpdates(
+        event.data.contextUpdates as Array<Record<string, unknown>> | undefined,
+        event.metadata?.event?.id,
+      )
+    }
+    catch (error) {
+      console.warn('[App] Failed to inspect proactive companion input:text context updates:', error)
+    }
+  })
   if (!isChatWindowRoute()) {
     contextBridgeStore.initialize()
     if (!isWidgetsWindowRoute()) {
@@ -258,10 +489,45 @@ onMounted(async () => {
 
   // Preload local inference models (Kokoro TTS, etc.) in background after a delay
   inferencePreload.triggerPreload()
+  await startBackgroundVisionIfEnabled()
 })
+
+watch([
+  visionAutoRun,
+  visionConfigured,
+  () => visionRunner.activeSourceId.value,
+  () => visionRunner.hasPermissions.value,
+], ([autoRun, configured, activeSourceId, hasPermissions]) => {
+  if (isChatWindowRoute() || isWidgetsWindowRoute() || !isVisionOwnerRoute() || !visionRunner.isOwnerWindow.value) {
+    return
+  }
+
+  if (!autoRun || !configured) {
+    void visionRunner.stopCaptureLoop()
+    return
+  }
+
+  if (!activeSourceId) {
+    return
+  }
+
+  if (!hasPermissions) {
+    return
+  }
+
+  if (!visionRunner.isRunning.value) {
+    void visionRunner.startCaptureLoop()
+  }
+}, { immediate: false })
 
 onUnmounted(() => {
   chatSyncLifecycle.dispose()
+  if (visionRunner.isOwnerWindow.value) {
+    void visionRunner.stopCaptureLoop()
+  }
+  if (!isChatWindowRoute() && !isWidgetsWindowRoute()) {
+    visionRunner.cleanup()
+  }
 })
 
 watch(themeColorsHue, () => {
@@ -286,6 +552,45 @@ onUnmounted(() => {
     <Toaster />
   </ToasterRoot>
   <ResizeHandler />
+  <div
+    v-if="showStartupDiagnosticsBanner"
+    :class="['pointer-events-none', 'fixed', 'left-0', 'right-0', 'top-4', 'z-50', 'px-4']"
+  >
+    <section
+      :class="[
+        'pointer-events-auto', 'mx-auto', 'flex', 'max-w-5xl', 'flex-col', 'gap-3',
+        'rounded-2xl', 'border', 'border-orange-200/80', 'bg-orange-50/95', 'p-4',
+        'shadow-[0_18px_48px_rgba(120,53,15,0.18)]', 'backdrop-blur-md',
+        'dark:border-orange-900/70', 'dark:bg-orange-950/85',
+        'lg:flex-row', 'lg:items-center', 'lg:justify-between',
+      ]"
+    >
+      <div :class="['flex', 'flex-col', 'gap-1']">
+        <div :class="['text-sm', 'font-semibold', 'text-orange-950', 'dark:text-orange-50']">
+          {{ t('settings.pages.system.health.startup-alert.title') }}
+        </div>
+        <p :class="['text-sm', 'leading-6', 'text-orange-900/85', 'dark:text-orange-100/80']">
+          {{ startupDiagnosticsBannerMessage }}
+        </p>
+      </div>
+
+      <div :class="['flex', 'flex-wrap', 'gap-2']">
+        <Button
+          variant="secondary"
+          size="sm"
+          icon="i-solar:heart-pulse-2-bold-duotone"
+          :label="t('settings.pages.system.health.actions.view-details')"
+          @click="openSystemHealthPage()"
+        />
+        <Button
+          variant="ghost"
+          size="sm"
+          :label="t('settings.pages.system.health.actions.ignore-alert')"
+          @click="systemHealthStore.dismissStartupAlert()"
+        />
+      </div>
+    </section>
+  </div>
   <RouterView />
 </template>
 

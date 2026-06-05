@@ -1,3 +1,7 @@
+import type {
+  ExternalMemoryContextSnapshot,
+  ExternalMemoryUsageSnapshot,
+} from './external-memory-shared'
 import type { AiriCard } from './modules'
 
 import { createTestingPinia } from '@pinia/testing'
@@ -5,7 +9,17 @@ import { setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { setCharacterLlmMarkerParserFactoryForTest, useCharacterStore } from './character'
+import { useCompanionCoordinationStore } from './companion-coordination-store'
+import {
+  createDefaultExternalMemoryJudgementSnapshot,
+  createDefaultExternalMemoryTurnSnapshot,
+  createDefaultExternalMemoryUsageSnapshot,
+  createExternalMemoryReasonSnapshot,
+  EXTERNAL_MEMORY_LAYER_KINDS,
+} from './external-memory-shared'
+import { useExternalMemoryStore } from './external-memory-store'
 import { useAiriCardStore } from './modules'
+import { useNahidaPersonaStore } from './nahida-persona-store'
 import { useSpeechRuntimeStore } from './speech-runtime'
 
 vi.mock('vue-i18n', () => ({
@@ -32,6 +46,42 @@ const openSpeechIntentSpy = vi.fn(() => ({
   end: endSpy,
   cancel: cancelSpy,
 }))
+
+function createMemoryContextSnapshot(): ExternalMemoryContextSnapshot {
+  return {
+    state: 'ready' as const,
+    reason: createExternalMemoryReasonSnapshot('context-loaded'),
+    summary: 'Loaded.',
+    readAt: 1,
+    layerOrder: [...EXTERNAL_MEMORY_LAYER_KINDS],
+    usedKinds: ['user-profile'],
+    usedLayers: ['stable-profile'],
+    documents: [],
+    turn: {
+      ...createDefaultExternalMemoryTurnSnapshot(),
+      readAt: 1,
+      usedLayers: ['stable-profile'],
+      summary: 'Loaded.',
+    },
+    sections: {
+      userProfile: ['The user prefers concise technical replies.'],
+      preferences: [],
+      followUps: [],
+      recentSummary: [],
+      characterKnowledge: [],
+    },
+  }
+}
+
+function createMemoryUsageSnapshot(): ExternalMemoryUsageSnapshot {
+  return {
+    ...createDefaultExternalMemoryUsageSnapshot(),
+    bridgeState: 'ready' as const,
+    reason: createExternalMemoryReasonSnapshot('bridge-ready'),
+    summary: 'Loaded.',
+    lastUsedDocumentKinds: ['user-profile'],
+  }
+}
 
 describe('store character', () => {
   beforeEach(() => {
@@ -91,6 +141,152 @@ describe('store character', () => {
 
     expect(store.name).toBe('Hero')
     expect(store.systemPrompt).toBe('You are a brave adventurer in Minecraft.')
+  })
+
+  it('adds the Nahida supplement once when the active card matches', () => {
+    const airiCardStore = useAiriCardStore()
+    // @ts-expect-error - testing purpose
+    airiCardStore.systemPrompt = 'Base card prompt.'
+    // @ts-expect-error - testing purpose
+    airiCardStore.activeCard = {
+      name: 'Nahida',
+      version: '1.0',
+      extensions: {
+        airi: {
+          agents: {},
+          modules: {
+            consciousness: {
+              provider: 'mock-provider',
+              model: 'mock-model',
+            },
+            speech: {
+              provider: 'mock-speech-provider',
+              model: 'mock-speech-model',
+              voice_id: 'alloy',
+            },
+          },
+        },
+      },
+    } satisfies AiriCard
+
+    const personaStore = useNahidaPersonaStore()
+    personaStore.applySettings({
+      enabled: true,
+      mode: 'balanced',
+    })
+
+    const store = useCharacterStore()
+    const prompt = store.systemPrompt
+
+    expect(prompt).toContain('Base card prompt.')
+    expect(prompt).toContain('[Nahida Persona Supplement]')
+    expect(prompt).toContain('Keep the current active card as the base persona.')
+    expect(prompt).toContain('Fact anchors:')
+    expect(prompt).toContain('birthday celebrated on October 27')
+    expect(prompt.match(/\[Nahida Persona Supplement\]/g)).toHaveLength(1)
+  })
+
+  it('adds the external memory supplement once when trusted memory is available', async () => {
+    const memoryStore = useExternalMemoryStore()
+    memoryStore.setBridge({
+      loadMemoryContext: async () => createMemoryContextSnapshot(),
+      refreshMemoryContext: async () => createMemoryContextSnapshot(),
+      getLastMemoryUsage: async () => createMemoryUsageSnapshot(),
+      recordMemoryObservation: vi.fn(async () => createDefaultExternalMemoryJudgementSnapshot()),
+      refreshMemoryJudgement: vi.fn(async () => createDefaultExternalMemoryJudgementSnapshot()),
+      getMemoryJudgementSnapshot: vi.fn(async () => createDefaultExternalMemoryJudgementSnapshot()),
+      clearMemoryCandidateLedger: vi.fn(async () => createDefaultExternalMemoryJudgementSnapshot()),
+      clearMemoryWriteCandidateHistory: vi.fn(),
+      writeFollowUpItems: vi.fn(),
+      writePreferencesPatch: vi.fn(),
+      writeRecentSummary: vi.fn(),
+      writeUserProfilePatch: vi.fn(),
+    })
+    await memoryStore.loadContext()
+
+    const store = useCharacterStore()
+    const prompt = store.systemPrompt
+
+    expect(prompt).toContain('[External Memory Context]')
+    expect(prompt).toContain('The user prefers concise technical replies.')
+    expect(prompt.match(/\[External Memory Context\]/g)).toHaveLength(1)
+  })
+
+  it('adds the coordination supplement once when at least one frozen surface is active', async () => {
+    const coordinationStore = useCompanionCoordinationStore()
+    coordinationStore.setBridge({
+      getSnapshot: async () => ({
+        status: 'attention',
+        reason: {
+          code: 'phase-attention',
+          message: 'Phase-six coordination still needs attention before the frozen memory, persona, and proactive surfaces can be treated as aligned.',
+        },
+        summary: '1 coordination surfaces need attention in the current phase.',
+        surfaces: [{
+          surface: 'memory',
+          title: 'Memory',
+          status: 'attention',
+          reason: {
+            code: 'memory-unavailable',
+            message: 'External memory bridge is not available in this runtime yet, so phase-six coordination cannot verify it.',
+          },
+          overview: {
+            summary: 'External memory bridge is not available in this runtime.',
+            reason: 'External memory bridge is not available in this runtime yet, so phase-six coordination cannot verify it.',
+            activity: 'No external memory activity has been recorded yet.',
+            coverage: 'Latest memory coverage: none recorded yet.',
+          },
+        }, {
+          surface: 'persona',
+          title: 'Persona',
+          status: 'inactive',
+          reason: {
+            code: 'persona-disabled',
+            message: 'Nahida persona is disabled by the user, so the base card stays unchanged and this surface remains inactive.',
+          },
+          overview: {
+            summary: 'Nahida persona layer is disabled. The active card remains unchanged.',
+            reason: 'Nahida persona is disabled by the user, so the base card stays unchanged and this surface remains inactive.',
+            activity: 'Persona mode: balanced. Disabled by user.',
+            coverage: 'Card: none. Display model: none.',
+          },
+        }, {
+          surface: 'proactive',
+          title: 'Proactive',
+          status: 'inactive',
+          reason: {
+            code: 'proactive-disabled',
+            message: 'Proactive governance is disabled, so companion-sidecar reminders stay outside AIRI in this phase.',
+          },
+          overview: {
+            summary: 'Proactive companion delivery is disabled.',
+            reason: 'Proactive governance is disabled, so companion-sidecar reminders stay outside AIRI in this phase.',
+            activity: 'No proactive reminder decisions have been recorded yet.',
+            coverage: 'Sidecar: status unavailable.',
+            updatedAt: 1,
+          },
+        }],
+        readyCount: 0,
+        attentionCount: 1,
+        inactiveCount: 2,
+        updatedAt: 1,
+      }),
+      refresh: async () => coordinationStore.snapshot,
+      clearHistory: async () => coordinationStore.snapshot,
+      refreshForSparkNotify: async () => ({
+        snapshot: coordinationStore.snapshot,
+        persona: useNahidaPersonaStore().snapshot,
+      }),
+    })
+    await coordinationStore.getSnapshot()
+
+    const store = useCharacterStore()
+    const prompt = store.systemPrompt
+
+    expect(prompt).toContain('[Companion Coordination Supplement]')
+    expect(prompt).toContain('Overall: attention.')
+    expect(prompt).toContain('Memory: attention.')
+    expect(prompt.match(/\[Companion Coordination Supplement\]/g)).toHaveLength(1)
   })
 
   it('records reactions and trims to the max size', () => {

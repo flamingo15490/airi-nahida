@@ -43,6 +43,7 @@ export function useVisionScreenCapture(sourcesOptions: MaybeRefOrGetter<SourcesO
   const {
     getSources,
     selectWithSource,
+    checkMacOSPermission,
   } = useElectronScreenCapture(window.electron.ipcRenderer, sourcesOptions)
 
   const activeSource = computed(() => sources.value.find(source => source.id === activeSourceId.value) || null)
@@ -186,5 +187,6 @@ export function useVisionScreenCapture(sourcesOptions: MaybeRefOrGetter<SourcesO
     stopStream,
     cleanup,
     captureFrame,
+    checkMacOSPermission,
   }
 }
