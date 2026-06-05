@@ -278,7 +278,7 @@ describe('companion coordination manager', () => {
     const proactiveSurface = snapshot.surfaces.find(surface => surface.surface === 'proactive')
 
     expect(proactiveSurface?.status).toBe('ready')
-    expect(proactiveSurface?.overview.activity).toBe('No proactive reminder decisions have been recorded yet.')
+    expect(proactiveSurface?.overview.activity).toBe('还没有记录到主动陪伴判定。')
     expect(proactiveSurface?.overview.updatedAt).toBe(40)
   })
 

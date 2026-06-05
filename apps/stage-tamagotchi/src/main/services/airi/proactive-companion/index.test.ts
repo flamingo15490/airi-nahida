@@ -125,7 +125,7 @@ describe('proactive companion manager', () => {
     expect(deliveredResult.managed).toBe(true)
     expect(deliveredResult.decision?.decision).toBe('delivered')
     expect(deliveredResult.decision?.presentation).toBe('light-prompt')
-    expect(deliveredResult.decision?.reason).toContain('passed source, destination, content, and cooldown checks')
+    expect(deliveredResult.decision?.reason).toContain('来源、目标、内容和冷却检查')
 
     const destinationSuppressedResult = manager.evaluateSparkNotify({
       type: 'spark:notify',
@@ -142,7 +142,7 @@ describe('proactive companion manager', () => {
 
     expect(destinationSuppressedResult.managed).toBe(true)
     expect(destinationSuppressedResult.decision?.decision).toBe('suppressed')
-    expect(destinationSuppressedResult.decision?.reason).toContain('did not target the AIRI character reminder destination')
+    expect(destinationSuppressedResult.decision?.reason).toContain('没有指向 AIRI 角色提醒目标')
 
     const suppressedResult = manager.evaluateSparkNotify({
       type: 'spark:notify',
@@ -159,7 +159,7 @@ describe('proactive companion manager', () => {
 
     expect(suppressedResult.managed).toBe(true)
     expect(suppressedResult.decision?.decision).toBe('suppressed')
-    expect(suppressedResult.decision?.reason).toContain('global proactive cooldown')
+    expect(suppressedResult.decision?.reason).toContain('全局主动陪伴冷却仍在生效')
     expect(suppressedResult.decision?.cooldownUntil).toBeTypeOf('number')
     expect(suppressedResult.runtime.recentDecisions[0]?.event.id).toBe('sidecar-2')
   })
@@ -195,7 +195,7 @@ describe('proactive companion manager', () => {
 
     expect(emptyResult.managed).toBe(true)
     expect(emptyResult.decision?.decision).toBe('suppressed')
-    expect(emptyResult.decision?.reason).toContain('did not include a headline or note')
+    expect(emptyResult.decision?.reason).toContain('没有提供值得展示为提醒的标题或备注')
   })
 
   it('maps missing or unsupported sidecar kinds into the conservative unknown bucket', async () => {
@@ -235,7 +235,7 @@ describe('proactive companion manager', () => {
 
     expect(result.managed).toBe(true)
     expect(result.decision?.decision).toBe('dropped')
-    expect(result.decision?.reason).toContain('Dropped because the companion sidecar is not currently ready')
+    expect(result.decision?.reason).toContain('companion sidecar 当前未就绪')
     expect(result.runtime.lastFailureReason).toContain('not connected')
   })
 
@@ -338,8 +338,8 @@ describe('proactive companion manager', () => {
     expect(runtimeAfterFirstRecord.recentDecisions[0]?.event.source).toBe('legacy:vision')
     expect(runtimeAfterFirstRecord.recentDecisions[0]?.event.kind).toBe('reminder')
     expect(runtimeAfterFirstRecord.recentDecisions[0]?.decision).toBe('delivered')
-    expect(runtimeAfterFirstRecord.recentDecisions[0]?.reason).toContain('legacy context:update compatibility path')
-    expect(runtimeAfterFirstRecord.recentDecisions[0]?.reason).toContain('history-only compatibility record')
+    expect(runtimeAfterFirstRecord.recentDecisions[0]?.reason).toContain('legacy context:update 兼容路径')
+    expect(runtimeAfterFirstRecord.recentDecisions[0]?.reason).toContain('只用于历史记录')
 
     const runtimeAfterDuplicateRecord = manager.recordContextUpdate({
       type: 'context:update',

@@ -283,6 +283,6 @@ describe('external integrations manager', () => {
     })
 
     expect(snapshot.status.state).toBe('ready')
-    expect(snapshot.status.summary).toBe('Companion sidecar is connected to the current AIRI server channel.')
+    expect(snapshot.status.summary).toBe('主动陪伴 sidecar 已连接到当前 AIRI 连接通道。')
   })
 })

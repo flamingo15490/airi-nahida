@@ -2,6 +2,10 @@ import { describe, expect, it } from 'vitest'
 
 import { resolvePreferredUserDataPath } from './user-data-path'
 
+function normalizePathSeparators(value: string | undefined) {
+  return value?.replaceAll('\\', '/')
+}
+
 describe('resolvePreferredUserDataPath', () => {
   it('prefers the explicit environment override when provided', () => {
     const resolution = resolvePreferredUserDataPath({
@@ -24,7 +28,7 @@ describe('resolvePreferredUserDataPath', () => {
     })
 
     expect(resolution.source).toBe('source-preview')
-    expect(resolution.path).toBe('C:\\Users\\Lenovo\\AppData\\Roaming\\@proj-airi\\stage-tamagotchi-source-preview')
+    expect(normalizePathSeparators(resolution.path)).toBe('C:/Users/Lenovo/AppData/Roaming/@proj-airi/stage-tamagotchi-source-preview')
   })
 
   it('falls back to the packaged AIRI profile when the preview profile is missing', () => {
@@ -35,7 +39,7 @@ describe('resolvePreferredUserDataPath', () => {
     })
 
     expect(resolution.source).toBe('legacy-app')
-    expect(resolution.path).toBe('C:\\Users\\Lenovo\\AppData\\Roaming\\ai.moeru.airi')
+    expect(normalizePathSeparators(resolution.path)).toBe('C:/Users/Lenovo/AppData/Roaming/ai.moeru.airi')
   })
 
   it('keeps Electron defaults outside source dev when there is no override', () => {
