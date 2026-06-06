@@ -129,6 +129,15 @@ const followUpsFileName = '\u5F85\u8DDF\u8FDB.md'
 const recentSummaryFileName = '\u8FD1\u671F\u6458\u8981.md'
 const characterKnowledgeDirectoryName = '\u89D2\u8272\u77E5\u8BC6\u5E93'
 const candidateLedgerFileName = 'external-memory-candidate-ledger.json'
+const defaultCharacterKnowledgeFileNames = [
+  '\u6838\u5FC3\u4EBA\u683C.md',
+  '\u8BED\u8A00\u98CE\u683C.md',
+  '\u7EA2\u7EBF\u6E05\u5355.md',
+  '\u4EBA\u9645\u5173\u7CFB.md',
+  '\u80CC\u666F\u6545\u4E8B.md',
+  '\u5916\u8C8C\u63CF\u5199.md',
+  '\u8BED\u6599\u5E93.md',
+] as const
 const maxRecentWrites = 8
 const maxStructuredItemsPerDocument = 8
 const maxRecentSummaryItems = 10
@@ -761,7 +770,20 @@ async function readCharacterKnowledge(rootPath: string, characterName?: string):
     const matchedCharacterEntries = normalizedCharacterName
       ? entries.filter(entry => entry.toLowerCase().includes(normalizedCharacterName))
       : []
-    const matchedCharacter = matchedCharacterEntries.length > 0
+    const defaultKnowledgeEntries = defaultCharacterKnowledgeFileNames
+      .filter(entry => entries.includes(entry))
+    const visibleEntries = entries.filter(entry => !entry.startsWith('.'))
+    // NOTICE:
+    // This fallback keeps the single-character AIRI builds working when the
+    // curated Nahida knowledge files intentionally use stable category names
+    // like “核心人格.md” instead of repeating the role name in each filename.
+    // We only enable it when the directory contains nothing except the known
+    // default knowledge files, so multi-character layouts still require an
+    // explicit role-name match and will not silently borrow another role's data.
+    const hasSingleCharacterFallback = matchedCharacterEntries.length === 0
+      && defaultKnowledgeEntries.length > 0
+      && visibleEntries.every(entry => defaultCharacterKnowledgeFileNames.includes(entry as typeof defaultCharacterKnowledgeFileNames[number]))
+    const matchedCharacter = matchedCharacterEntries.length > 0 || hasSingleCharacterFallback
 
     if (!matchedCharacter) {
       return {
@@ -776,11 +798,8 @@ async function readCharacterKnowledge(rootPath: string, characterName?: string):
     }
 
     const prioritizedEntries = [
-      ...matchedCharacterEntries,
-      '\u6838\u5FC3\u4EBA\u683C.md',
-      '\u8BED\u8A00\u98CE\u683C.md',
-      '\u7EA2\u7EBF\u6E05\u5355.md',
-      '\u4EBA\u9645\u5173\u7CFB.md',
+      ...(matchedCharacterEntries.length > 0 ? matchedCharacterEntries : defaultKnowledgeEntries),
+      ...defaultCharacterKnowledgeFileNames,
     ]
       .filter((entry, index, array) => array.indexOf(entry) === index)
       .filter(entry => entries.includes(entry))
@@ -805,7 +824,9 @@ async function readCharacterKnowledge(rootPath: string, characterName?: string):
         path: knowledgeDirectoryPath,
         available: true,
         summary: collectedItems.length > 0
-          ? '已为当前角色选取轻量角色知识片段。'
+          ? hasSingleCharacterFallback
+            ? '未命中角色命名文件，已按单角色资料目录选取角色知识片段。'
+            : '已为当前角色选取轻量角色知识片段。'
           : '角色知识文件可用，但没有提取出可用片段。',
         items: collectedItems.slice(0, maxStructuredItemsPerDocument),
       }),

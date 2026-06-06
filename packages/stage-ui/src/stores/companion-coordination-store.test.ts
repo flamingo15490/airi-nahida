@@ -590,7 +590,7 @@ describe('companion coordination snapshot', () => {
     expect(snapshot.surfaces[2]?.status).toBe('ready')
     expect(snapshot.surfaces[2]?.reason.code).toBe('proactive-cooldown-active')
     expect(snapshot.surfaces[2]?.overview.activity).toBe('最近判定：已压制。当前可查看 1 条最近判定。')
-    expect(snapshot.surfaces[2]?.overview.coverage).toBe('sidecar：Companion sidecar is connected to the current AIRI server channel.')
+    expect(snapshot.surfaces[2]?.overview.coverage).toContain('外部 Sidecar')
     expect(snapshot.surfaces[2]?.overview.updatedAt).toBe(20)
   })
 
@@ -640,7 +640,7 @@ describe('companion coordination snapshot', () => {
     expect(snapshot.surfaces[2]?.status).toBe('ready')
     expect(snapshot.surfaces[2]?.reason.code).toBe('proactive-ready')
     expect(snapshot.surfaces[2]?.overview.activity).toBe('最近判定：已放行。当前可查看 1 条最近判定。')
-    expect(snapshot.surfaces[2]?.overview.coverage).toBe('sidecar：已连接。')
+    expect(snapshot.surfaces[2]?.overview.coverage).toContain('外部 Sidecar')
   })
 
   it('refreshes, clears history, and exposes detail routes through the desktop bridge', async () => {
@@ -695,5 +695,87 @@ describe('companion coordination snapshot', () => {
     expect(store.detailRouteFor('memory')).toBe('/settings/integrations')
     expect(store.detailRouteFor('persona')).toBe('/settings/nahida-persona')
     expect(store.detailRouteFor('proactive')).toBe('/settings/proactive-companion')
+  })
+
+  it('syncs the proactive surface from runtime events without a full desktop refresh', async () => {
+    const store = useCompanionCoordinationStore()
+    const staleSnapshot = composeCompanionCoordinationSnapshot({
+      memoryUsage: createDisabledMemorySnapshot(),
+      persona: createDisabledPersonaSnapshot(),
+      proactiveRuntime: createReadyProactiveRuntimeSnapshot({
+        summary: 'External sidecar runtime is healthy.',
+        settings: {
+          ...createDefaultProactiveCompanionRuntimeSnapshot().settings,
+          sourceMode: 'external-sidecar',
+        },
+        lastSignalSource: undefined,
+        lastDegradedReason: undefined,
+        refreshedAt: 20,
+      }),
+    })
+
+    store.setBridge({
+      getSnapshot: vi.fn().mockResolvedValue(staleSnapshot),
+      refresh: vi.fn().mockResolvedValue(staleSnapshot),
+      clearHistory: vi.fn().mockResolvedValue(staleSnapshot),
+      refreshForSparkNotify: vi.fn().mockResolvedValue({
+        snapshot: staleSnapshot,
+        persona: createReadyPersonaSnapshot(),
+      }),
+    })
+
+    await store.getSnapshot()
+
+    store.syncProactiveRuntime(createReadyProactiveRuntimeSnapshot({
+      summary: 'Embedded runtime is healthy.',
+      settings: {
+        ...createDefaultProactiveCompanionRuntimeSnapshot().settings,
+        sourceMode: 'embedded',
+      },
+      recentDecisions: [{
+        event: {
+          id: 'embedded-manual-1',
+          source: 'embedded:manual',
+          kind: 'gentle-check-in',
+          headline: '现在适合轻轻确认一下近况',
+          topicKey: 'manual-check-in',
+          destinations: ['character'],
+          receivedAt: 98,
+        },
+        decision: 'delivered',
+        reason: '已放行，因为信号通过了空闲、冷却、主题和频率检查。',
+        presentation: 'light-prompt',
+        matchedSource: true,
+        sidecarReady: false,
+        decidedAt: 99,
+      }],
+      lastDecision: {
+        event: {
+          id: 'embedded-manual-1',
+          source: 'embedded:manual',
+          kind: 'gentle-check-in',
+          headline: '现在适合轻轻确认一下近况',
+          topicKey: 'manual-check-in',
+          destinations: ['character'],
+          receivedAt: 98,
+        },
+        decision: 'delivered',
+        reason: '已放行，因为信号通过了空闲、冷却、主题和频率检查。',
+        presentation: 'light-prompt',
+        matchedSource: true,
+        sidecarReady: false,
+        decidedAt: 99,
+      },
+      lastSignalSource: 'manual',
+      lastDegradedReason: 'vision lane paused',
+      lastManualTriggerAt: 99,
+      refreshedAt: 100,
+    }))
+
+    expect(store.snapshot.surfaces[2]?.overview.summary).toBe('Embedded runtime is healthy.')
+    expect(store.snapshot.surfaces[2]?.overview.activity).toContain('降级原因：vision lane paused。')
+    expect(store.snapshot.surfaces[2]?.overview.coverage).toContain('模式：内建引擎。')
+    expect(store.snapshot.surfaces[2]?.overview.coverage).toContain('最近信号：manual。')
+    expect(store.snapshot.updatedAt).toBe(100)
   })
 })

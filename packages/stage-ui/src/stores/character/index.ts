@@ -5,6 +5,7 @@ import { defineStore, storeToRefs } from 'pinia'
 import { computed, reactive, ref } from 'vue'
 
 import { useLlmmarkerParser } from '../../composables/llm-marker-parser'
+import { stripTextForSpeech } from '../../utils/tts'
 import { useCompanionCoordinationStore } from '../companion-coordination-store'
 import { useExternalMemoryStore } from '../external-memory-store'
 import { useAiriCardStore } from '../modules'
@@ -74,7 +75,7 @@ export const useCharacterStore = defineStore('character', () => {
       },
     })
 
-    await parser.consume(text)
+    await parser.consume(stripTextForSpeech(text))
     await parser.end()
 
     intent.writeFlush()
@@ -123,12 +124,45 @@ export const useCharacterStore = defineStore('character', () => {
     if (!state)
       return
 
-    state.reaction.message = fullText
-    recordSparkNotifyReaction(sparkEventId, fullText, { metadata: options?.metadata })
+    // Keep original markdown for UI display in the recorded reaction,
+    // but deliver stripped text to TTS so annotations are not spoken.
+    const strippedText = stripTextForSpeech(fullText)
+    state.reaction.message = strippedText
+    recordSparkNotifyReaction(sparkEventId, strippedText, { metadata: options?.metadata })
 
+    // End the streaming parser (which consumed raw markdown chunks),
+    // then re-feed the fully stripped text through a fresh intent for clean TTS.
     void state.parser.end().then(() => {
       state.intent.writeFlush()
       state.intent.end()
+
+      // Replace streaming TTS output with a clean stripped pass
+      const cleanIntent = speechRuntimeStore.openIntent({
+        turnId: `spark:${sparkEventId}:clean`,
+        intentId: `spark:${sparkEventId}:clean`,
+        ownerId: ownerId.value,
+        priority: 'high',
+        behavior: 'interrupt',
+      })
+
+      const cleanParser = parserFactory({
+        onLiteral: async (literal) => {
+          if (literal)
+            cleanIntent.writeLiteral(literal)
+        },
+        onSpecial: async (special) => {
+          if (special)
+            cleanIntent.writeSpecial(special)
+        },
+      })
+
+      void cleanParser.consume(strippedText).then(() => {
+        void cleanParser.end().then(() => {
+          cleanIntent.writeFlush()
+          cleanIntent.end()
+        })
+      })
+
       streamingReactions.value.delete(sparkEventId)
     })
   }

@@ -191,32 +191,49 @@ function probeProactive(params: {
   refreshError?: string
   runtime: ProactiveCompanionRuntimeSnapshot
 }) {
+  const sourceMode = params.runtime.settings.sourceMode
+  const sidecarNote = sourceMode === 'embedded'
+    ? undefined
+    : params.runtime.sidecarSummary ? `Sidecar: ${params.runtime.sidecarSummary}.` : undefined
+
   const detail = appendRefreshError(joinDiagnosticSentences([
     params.runtime.summary,
     params.runtime.lastFailureReason ? `Latest failure: ${params.runtime.lastFailureReason}.` : undefined,
-    params.runtime.sidecarSummary ? `Sidecar: ${params.runtime.sidecarSummary}.` : undefined,
+    sidecarNote,
   ]), params.refreshError)
 
   if (params.runtime.state === 'ready') {
+    const summary = sourceMode === 'embedded'
+      ? 'Embedded proactive engine ready.'
+      : 'Proactive companion ready.'
     return downgradeProbeOnRefreshFailure(createProbe({
       kind: 'proactive',
       status: 'healthy',
-      summary: 'Proactive companion ready.',
+      summary,
       detail,
       checkedAt: params.checkedAt,
     }), params.refreshError, {
-      summary: 'Proactive companion needs attention.',
-      actionHint: 'Check the companion-sidecar connection and proactive reminder settings.',
+      summary: sourceMode === 'embedded'
+        ? 'Embedded proactive engine needs attention.'
+        : 'Proactive companion needs attention.',
+      actionHint: sourceMode === 'embedded'
+        ? 'Check the embedded proactive engine settings and system idle probe.'
+        : 'Check the companion-sidecar connection and proactive reminder settings.',
     })
   }
 
   if (params.runtime.state === 'degraded') {
+    const sourceMode = params.runtime.settings.sourceMode
     return createProbe({
       kind: 'proactive',
       status: 'degraded',
-      summary: 'Proactive companion needs attention.',
+      summary: sourceMode === 'embedded'
+        ? 'Embedded proactive engine needs attention.'
+        : 'Proactive companion needs attention.',
       detail,
-      actionHint: 'Check the companion-sidecar connection and proactive reminder settings.',
+      actionHint: sourceMode === 'embedded'
+        ? 'Check the embedded proactive engine settings and system idle probe.'
+        : 'Check the companion-sidecar connection and proactive reminder settings.',
       checkedAt: params.checkedAt,
     })
   }

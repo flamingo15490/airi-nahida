@@ -1,4 +1,9 @@
 <script setup lang="ts">
+import type {
+  ProactiveCompanionDispatchEvent,
+  ProactiveCompanionSparkNotifyInput,
+} from '../shared/proactive-companion'
+
 import { defineInvokeHandler } from '@moeru/eventa'
 import { useElectronEventaContext, useElectronEventaInvoke } from '@proj-airi/electron-vueuse'
 import { themeColorFromValue, useThemeColor } from '@proj-airi/stage-layouts/composables/theme-color'
@@ -53,13 +58,22 @@ import {
   electronGodotStageStatusChanged,
   electronNahidaPersonaGetConfig,
   electronNahidaPersonaSaveConfig,
+  electronProactiveCompanionClearCooldowns,
   electronProactiveCompanionClearHistory,
   electronProactiveCompanionEvaluateSparkNotify,
   electronProactiveCompanionGetRuntimeSnapshot,
+  electronProactiveCompanionGetSourceMode,
+  electronProactiveCompanionImportLegacyConfig,
   electronProactiveCompanionLoadConfig,
+  electronProactiveCompanionPause,
   electronProactiveCompanionRecordContextUpdate,
+  electronProactiveCompanionRecordVisionObservation,
   electronProactiveCompanionRefreshRuntime,
+  electronProactiveCompanionRuntimeEvent,
   electronProactiveCompanionSaveConfig,
+  electronProactiveCompanionSetSourceMode,
+  electronProactiveCompanionSimulateSignal,
+  electronProactiveCompanionTriggerManualCheckIn,
   electronSettingsNavigate,
   electronStartTrackMousePosition,
   i18nGetLocale,
@@ -83,6 +97,7 @@ import { initializeElectronAuthCallbackBridge } from './bridges/electron-auth-ca
 import { initializeStageThreeRuntimeTraceBridge } from './bridges/stage-three-runtime-trace'
 import { useLanguage } from './composables/use-language'
 import { useVisionRunner } from './composables/use-vision-runner'
+import { handleProactiveRuntimeEvent } from './proactive-runtime-events'
 import { createChatSyncWindowLifecycle } from './stores/chat-sync-lifecycle'
 import { useTamagotchiMcpToolsStore } from './stores/mcp-tools'
 import { useTamagotchiPluginToolsStore } from './stores/plugin-tools'
@@ -160,6 +175,14 @@ const refreshProactiveCompanionRuntime = useElectronEventaInvoke(electronProacti
 const clearProactiveCompanionHistory = useElectronEventaInvoke(electronProactiveCompanionClearHistory)
 const evaluateProactiveCompanionSparkNotify = useElectronEventaInvoke(electronProactiveCompanionEvaluateSparkNotify)
 const recordProactiveCompanionContextUpdate = useElectronEventaInvoke(electronProactiveCompanionRecordContextUpdate)
+const importLegacyProactiveCompanionConfig = useElectronEventaInvoke(electronProactiveCompanionImportLegacyConfig)
+const getProactiveCompanionSourceMode = useElectronEventaInvoke(electronProactiveCompanionGetSourceMode)
+const setProactiveCompanionSourceMode = useElectronEventaInvoke(electronProactiveCompanionSetSourceMode)
+const triggerProactiveCompanionManualCheckIn = useElectronEventaInvoke(electronProactiveCompanionTriggerManualCheckIn)
+const simulateProactiveCompanionSignal = useElectronEventaInvoke(electronProactiveCompanionSimulateSignal)
+const pauseProactiveCompanion = useElectronEventaInvoke(electronProactiveCompanionPause)
+const clearProactiveCompanionCooldowns = useElectronEventaInvoke(electronProactiveCompanionClearCooldowns)
+const recordProactiveCompanionVisionObservation = useElectronEventaInvoke(electronProactiveCompanionRecordVisionObservation)
 const reportPluginCapability = useElectronEventaInvoke(electronPluginUpdateCapability)
 const getMainLocale = useElectronEventaInvoke(i18nGetLocale)
 const setLocale = useElectronEventaInvoke(i18nSetLocale)
@@ -167,6 +190,7 @@ const getGodotStageStatus = useElectronEventaInvoke(electronGodotStageGetStatus)
 const syncArtistryConfig = useElectronEventaInvoke(artistrySyncConfig)
 const chatSyncLifecycle = createChatSyncWindowLifecycle(route.path)
 const isChatWindowRoute = () => route.path === '/chat'
+const isMainStageRoute = () => route.path === '/'
 const isGodotStageRoute = () => route.path === '/' || route.path.startsWith('/settings')
 const isVisionOwnerRoute = () => route.path === '/'
 const isWidgetsWindowRoute = () => route.path === '/widgets'
@@ -263,6 +287,29 @@ async function startBackgroundVisionIfEnabled() {
   }
 }
 
+function notifyOffStageProactiveDelivery(event: ProactiveCompanionDispatchEvent) {
+  const title = event.sparkNotify?.data.headline?.trim()
+    || event.decision.event.headline
+    || 'AIRI 主动陪伴已送达'
+  const description = event.sparkNotify?.data.note?.trim()
+    || event.decision.event.note
+    || '当前不在主舞台页，先用轻提示代替角色短反应。'
+
+  toast.success(title, { description })
+}
+
+async function reactToDeliveredProactiveReminder(sparkNotify: ProactiveCompanionSparkNotifyInput) {
+  await characterOrchestratorStore.handleSparkNotifyWithReaction(sparkNotify, {
+    forceTextResponse: true,
+    messageOverride: {
+      appendSystemInstructions: [
+        'This embedded proactive reminder already passed AIRI governance.',
+        'Reply with one brief, warm, restrained reminder and do not emit spark commands.',
+      ],
+    },
+  })
+}
+
 function openSystemHealthPage() {
   void router.push('/settings/system/health').catch((error) => {
     console.warn('[App] Failed to navigate to system health page:', error)
@@ -328,6 +375,14 @@ proactiveCompanionStore.setBridge({
   clearHistory: () => clearProactiveCompanionHistory(),
   evaluateSparkNotify: event => evaluateProactiveCompanionSparkNotify(event),
   recordContextUpdate: event => recordProactiveCompanionContextUpdate(event),
+  importLegacyConfig: () => importLegacyProactiveCompanionConfig(),
+  getSourceMode: () => getProactiveCompanionSourceMode(),
+  setSourceMode: mode => setProactiveCompanionSourceMode(mode),
+  triggerManualCheckIn: () => triggerProactiveCompanionManualCheckIn(),
+  simulateSignal: request => simulateProactiveCompanionSignal(request),
+  pauseCompanion: request => pauseProactiveCompanion(request),
+  clearCooldowns: () => clearProactiveCompanionCooldowns(),
+  recordVisionObservation: observation => recordProactiveCompanionVisionObservation(observation),
 })
 
 coordinationStore.setBridge({
@@ -377,6 +432,21 @@ context.value.on(electronSettingsNavigate, (event) => {
   void router.push(targetRoute).catch((error) => {
     console.warn('Failed to navigate settings window:', error)
   })
+})
+
+context.value.on(electronProactiveCompanionRuntimeEvent, async (event) => {
+  try {
+    await handleProactiveRuntimeEvent(event, {
+      applyRuntimeSnapshot: proactiveCompanionStore.applyRuntimeSnapshot,
+      syncCoordinationRuntime: coordinationStore.syncProactiveRuntime,
+      isMainStageRoute,
+      reactOnMainStage: reactToDeliveredProactiveReminder,
+      notifyOffStageDelivery: notifyOffStageProactiveDelivery,
+    })
+  }
+  catch (error) {
+    console.warn('[App] Failed to react to embedded proactive runtime event:', error)
+  }
 })
 
 context.value.on(electronGodotStageStatusChanged, (event) => {

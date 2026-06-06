@@ -22,6 +22,7 @@ import { useLLM } from '../../llm'
 import { useModsServerChannelStore } from '../../mods/api/channel-server'
 import { useAiriCardStore, useConsciousnessStore } from '../../modules'
 import { useNahidaPersonaStore } from '../../nahida-persona-store'
+import { createDefaultProactiveCompanionRuntimeSnapshot, createDefaultProactiveCompanionSettings } from '../../proactive-companion-shared'
 import { useProactiveCompanionStore } from '../../proactive-companion-store'
 import { useProvidersStore } from '../../providers'
 
@@ -414,6 +415,7 @@ describe('store character-orchestrator', () => {
     const proactiveStore = useProactiveCompanionStore()
     proactiveStore.setBridge({
       loadConfig: async () => ({
+        ...createDefaultProactiveCompanionSettings(),
         enabled: true,
         globalCooldownMs: 180000,
         topicCooldownMs: 600000,
@@ -421,7 +423,9 @@ describe('store character-orchestrator', () => {
       }),
       saveConfig: async settings => settings,
       getRuntimeSnapshot: async () => ({
+        ...createDefaultProactiveCompanionRuntimeSnapshot(),
         settings: {
+          ...createDefaultProactiveCompanionSettings(),
           enabled: true,
           globalCooldownMs: 180000,
           topicCooldownMs: 600000,
@@ -435,7 +439,9 @@ describe('store character-orchestrator', () => {
         refreshedAt: 1,
       }),
       refreshRuntime: async () => ({
+        ...createDefaultProactiveCompanionRuntimeSnapshot(),
         settings: {
+          ...createDefaultProactiveCompanionSettings(),
           enabled: true,
           globalCooldownMs: 180000,
           topicCooldownMs: 600000,
@@ -449,7 +455,9 @@ describe('store character-orchestrator', () => {
         refreshedAt: 1,
       }),
       clearHistory: async () => ({
+        ...createDefaultProactiveCompanionRuntimeSnapshot(),
         settings: {
+          ...createDefaultProactiveCompanionSettings(),
           enabled: true,
           globalCooldownMs: 180000,
           topicCooldownMs: 600000,
@@ -463,7 +471,9 @@ describe('store character-orchestrator', () => {
         refreshedAt: 1,
       }),
       recordContextUpdate: async () => ({
+        ...createDefaultProactiveCompanionRuntimeSnapshot(),
         settings: {
+          ...createDefaultProactiveCompanionSettings(),
           enabled: true,
           globalCooldownMs: 180000,
           topicCooldownMs: 600000,
@@ -496,12 +506,15 @@ describe('store character-orchestrator', () => {
           decidedAt: 2,
         },
         runtime: {
+          ...createDefaultProactiveCompanionRuntimeSnapshot(),
           settings: {
+            ...createDefaultProactiveCompanionSettings(),
             enabled: true,
             globalCooldownMs: 180000,
             topicCooldownMs: 600000,
             intensity: 'low',
           },
+          engineActive: true,
           state: 'ready',
           summary: 'ready',
           sidecarConnected: true,
@@ -509,6 +522,34 @@ describe('store character-orchestrator', () => {
           recentDecisions: [],
           refreshedAt: 2,
         },
+      }),
+
+      importLegacyConfig: async () => ({
+        mappedFields: [],
+        unmappedFields: [],
+        sourceMode: 'external-sidecar' as const,
+        switchedToEmbedded: false,
+        settings: createDefaultProactiveCompanionSettings(),
+        importedAt: Date.now(),
+      }),
+      getSourceMode: async () => 'external-sidecar' as const,
+      setSourceMode: async () => createDefaultProactiveCompanionRuntimeSnapshot(),
+      triggerManualCheckIn: async () => ({
+        ok: true,
+        message: 'manual',
+        runtime: createDefaultProactiveCompanionRuntimeSnapshot(),
+      }),
+      simulateSignal: async () => ({
+        ok: true,
+        message: 'simulated',
+        runtime: createDefaultProactiveCompanionRuntimeSnapshot(),
+      }),
+      pauseCompanion: async () => createDefaultProactiveCompanionRuntimeSnapshot(),
+      clearCooldowns: async () => createDefaultProactiveCompanionRuntimeSnapshot(),
+      recordVisionObservation: async () => ({
+        ok: true,
+        message: 'recorded',
+        runtime: createDefaultProactiveCompanionRuntimeSnapshot(),
       }),
     })
 
@@ -560,7 +601,9 @@ describe('store character-orchestrator', () => {
 
     const proactiveStore = useProactiveCompanionStore()
     const runtimeSnapshot = {
+      ...createDefaultProactiveCompanionRuntimeSnapshot(),
       settings: {
+        ...createDefaultProactiveCompanionSettings(),
         enabled: true,
         globalCooldownMs: 180000,
         topicCooldownMs: 600000,
@@ -575,6 +618,7 @@ describe('store character-orchestrator', () => {
     }
     proactiveStore.setBridge({
       loadConfig: async () => ({
+        ...createDefaultProactiveCompanionSettings(),
         enabled: true,
         globalCooldownMs: 180000,
         topicCooldownMs: 600000,
@@ -605,6 +649,34 @@ describe('store character-orchestrator', () => {
           decidedAt: 2,
         },
         runtime: runtimeSnapshot,
+      }),
+
+      importLegacyConfig: async () => ({
+        mappedFields: [],
+        unmappedFields: [],
+        sourceMode: 'external-sidecar' as const,
+        switchedToEmbedded: false,
+        settings: createDefaultProactiveCompanionSettings(),
+        importedAt: Date.now(),
+      }),
+      getSourceMode: async () => 'external-sidecar' as const,
+      setSourceMode: async () => createDefaultProactiveCompanionRuntimeSnapshot(),
+      triggerManualCheckIn: async () => ({
+        ok: true,
+        message: 'manual',
+        runtime: createDefaultProactiveCompanionRuntimeSnapshot(),
+      }),
+      simulateSignal: async () => ({
+        ok: true,
+        message: 'simulated',
+        runtime: createDefaultProactiveCompanionRuntimeSnapshot(),
+      }),
+      pauseCompanion: async () => createDefaultProactiveCompanionRuntimeSnapshot(),
+      clearCooldowns: async () => createDefaultProactiveCompanionRuntimeSnapshot(),
+      recordVisionObservation: async () => ({
+        ok: true,
+        message: 'recorded',
+        runtime: createDefaultProactiveCompanionRuntimeSnapshot(),
       }),
     })
 

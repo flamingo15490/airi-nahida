@@ -8,6 +8,7 @@ import { useI18n } from 'vue-i18n'
 import { useProactiveCompanionSettingsStore } from '../../../stores/settings/proactive-companion'
 
 const proactiveStore = useProactiveCompanionSettingsStore()
+const { lastImportSummary } = storeToRefs(proactiveStore)
 const runtimeStore = useProactiveCompanionStore()
 const {
   clearing,
@@ -27,6 +28,24 @@ const {
   latestLegacyDecision,
 } = storeToRefs(runtimeStore)
 const { t } = useI18n()
+
+const sourceModeOptions = computed(() => ([
+  {
+    value: 'embedded',
+    label: '内建规则',
+    description: '使用内建规则直接判断空闲、视觉和记忆信号。',
+  },
+  {
+    value: 'external-sidecar',
+    label: '外部 Sidecar',
+    description: '继续接入外部 proactive-companion sidecar。',
+  },
+]))
+
+const sourceModeModel = computed({
+  get: () => settings.value.sourceMode,
+  set: (value) => { settings.value.sourceMode = value },
+})
 
 const intensityOptions = computed(() => ([
   {
@@ -54,6 +73,46 @@ const topicCooldownModel = computed({
   set: (value: string) => {
     const parsed = Number.parseInt(value, 10)
     settings.value.topicCooldownMs = Number.isFinite(parsed) && parsed > 0 ? parsed * 1000 : 0
+  },
+})
+
+const idleThresholdModel = computed({
+  get: () => String(Math.round(settings.value.idleThresholdMs / 1000)),
+  set: (value: string) => {
+    const parsed = Number.parseInt(value, 10)
+    settings.value.idleThresholdMs = Number.isFinite(parsed) && parsed > 0 ? parsed * 1000 : 0
+  },
+})
+
+const urgentCooldownModel = computed({
+  get: () => String(Math.round(settings.value.urgentCooldownMs / 1000)),
+  set: (value: string) => {
+    const parsed = Number.parseInt(value, 10)
+    settings.value.urgentCooldownMs = Number.isFinite(parsed) && parsed > 0 ? parsed * 1000 : 0
+  },
+})
+
+const memoryCooldownModel = computed({
+  get: () => String(Math.round(settings.value.memoryCooldownMs / 1000)),
+  set: (value: string) => {
+    const parsed = Number.parseInt(value, 10)
+    settings.value.memoryCooldownMs = Number.isFinite(parsed) && parsed > 0 ? parsed * 1000 : 0
+  },
+})
+
+const visionCooldownModel = computed({
+  get: () => String(Math.round(settings.value.visionCooldownMs / 1000)),
+  set: (value: string) => {
+    const parsed = Number.parseInt(value, 10)
+    settings.value.visionCooldownMs = Number.isFinite(parsed) && parsed > 0 ? parsed * 1000 : 0
+  },
+})
+
+const sameTopicCooldownModel = computed({
+  get: () => String(Math.round(settings.value.sameTopicCooldownMs / 60000)),
+  set: (value: string) => {
+    const parsed = Number.parseInt(value, 10)
+    settings.value.sameTopicCooldownMs = Number.isFinite(parsed) && parsed > 0 ? parsed * 60000 : 0
   },
 })
 
@@ -290,6 +349,86 @@ onMounted(() => {
         </div>
       </div>
 
+      <FieldSelect
+        v-model="sourceModeModel"
+        :disabled="loading || saving || refreshing"
+        label="信号来源模式"
+        description="选择当前主动陪伴信号采用哪条治理路径。"
+        :options="sourceModeOptions"
+      />
+
+      <FieldCheckbox
+        v-model="settings.engineEnabled"
+        :disabled="loading || saving || refreshing"
+        label="启用内建引擎"
+        description="决定是否让内建规则继续产生活动候选信号。"
+      />
+
+      <div v-if="settings.sourceMode === 'embedded'" :class="['flex', 'flex-col', 'gap-3', 'rounded-lg', 'border', 'border-dashed', 'border-neutral-200', 'bg-neutral-50/60', 'p-3', 'dark:border-neutral-800', 'dark:bg-neutral-950/30']">
+        <p :class="['text-xs', 'font-medium', 'text-neutral-600', 'dark:text-neutral-300']">
+          内建规则区
+        </p>
+        <FieldInput
+          v-model="idleThresholdModel"
+          :disabled="loading || saving || refreshing"
+          label="空闲阈值（秒）"
+          description="用户安静到这个阈值后，允许进入空闲 check-in 判断。"
+          placeholder="90"
+        />
+        <FieldInput
+          v-model="urgentCooldownModel"
+          :disabled="loading || saving || refreshing"
+          label="紧急冷却（秒）"
+          description="紧急类提醒再次放行前需要等待的最短时间。"
+          placeholder="90"
+        />
+        <FieldInput
+          v-model="memoryCooldownModel"
+          :disabled="loading || saving || refreshing"
+          label="记忆冷却（秒）"
+          description="记忆待跟进类提醒再次放行前需要等待的时间。"
+          placeholder="180"
+        />
+        <FieldInput
+          v-model="visionCooldownModel"
+          :disabled="loading || saving || refreshing"
+          label="视觉冷却（秒）"
+          description="视觉变化类提醒再次放行前需要等待的时间。"
+          placeholder="180"
+        />
+        <FieldInput
+          v-model="sameTopicCooldownModel"
+          :disabled="loading || saving || refreshing"
+          label="同主题冷却（分钟）"
+          description="相同主题在这段时间内不会重复放行。"
+          placeholder="30"
+        />
+        <FieldCheckbox
+          v-model="settings.visionEnabled"
+          :disabled="loading || saving || refreshing"
+          label="视觉信号"
+          description="决定是否接收视觉变化产生的候选提醒。"
+        />
+        <FieldCheckbox
+          v-model="settings.memoryEnabled"
+          :disabled="loading || saving || refreshing"
+          label="记忆信号"
+          description="决定是否接收稳定待跟进事项产生的候选提醒。"
+        />
+        <FieldCheckbox
+          v-model="settings.allowInterruptOnUrgent"
+          :disabled="loading || saving || refreshing"
+          label="允许紧急打断"
+          description="紧急信号到来时，是否允许直接打断当前活动。"
+        />
+        <FieldCheckbox
+          v-model="settings.workingNudgeEnabled"
+          :disabled="loading || saving || refreshing"
+          label="启用工作中轻提醒"
+          description="让记忆/视觉信号在未完全空闲时也能走更克制的提醒路径。"
+        />
+      </div>
+
       <div :class="['flex', 'flex-wrap', 'gap-2']">
         <Button
           variant="primary"
@@ -318,6 +457,91 @@ onMounted(() => {
           icon="i-solar:trash-bin-trash-bold-duotone"
           @click="proactiveStore.clearHistory()"
         />
+      </div>
+    </section>
+
+    <section :class="['flex', 'flex-col', 'gap-3', 'rounded-xl', 'border', 'border-neutral-200', 'bg-white/80', 'p-4', 'dark:border-neutral-800', 'dark:bg-neutral-900/40']">
+      <div :class="['flex', 'flex-col', 'gap-1']">
+        <h3 :class="['text-sm', 'font-semibold']">
+          轻量操作台
+        </h3>
+        <p :class="['text-xs', 'text-neutral-500', 'dark:text-neutral-400']">
+          手动触发演练，快速确认当前 embedded 主动陪伴链路的行为。
+        </p>
+      </div>
+      <div :class="['flex', 'flex-wrap', 'gap-2']">
+        <Button
+          variant="secondary"
+          size="sm"
+          :disabled="loading || saving || refreshing"
+          label="手动 Check-in"
+          icon="i-solar:bell-bold-duotone"
+          @click="proactiveStore.triggerManualCheckIn()"
+        />
+        <Button
+          variant="secondary"
+          size="sm"
+          :disabled="loading || saving || refreshing"
+          label="模拟记忆信号"
+          icon="i-solar:bookmark-bold-duotone"
+          @click="proactiveStore.simulateSignal({ kind: 'memory-follow-up' })"
+        />
+        <Button
+          variant="secondary"
+          size="sm"
+          :disabled="loading || saving || refreshing"
+          label="模拟视觉提醒"
+          icon="i-solar:eye-bold-duotone"
+          @click="proactiveStore.simulateSignal({ kind: 'vision-reminder' })"
+        />
+        <Button
+          variant="secondary"
+          size="sm"
+          :disabled="loading || saving || refreshing"
+          label="模拟紧急提醒"
+          icon="i-solar:danger-bold-duotone"
+          @click="proactiveStore.simulateSignal({ kind: 'urgent-reminder' })"
+        />
+        <Button
+          variant="secondary-muted"
+          size="sm"
+          :disabled="loading || saving || refreshing"
+          label="暂停 30 分钟"
+          icon="i-solar:pause-bold-duotone"
+          @click="proactiveStore.pauseCompanion(30 * 60 * 1000)"
+        />
+        <Button
+          variant="secondary-muted"
+          size="sm"
+          :disabled="loading || saving || refreshing"
+          label="清除冷却"
+          icon="i-solar:refresh-bold-duotone"
+          @click="proactiveStore.clearCooldowns()"
+        />
+        <Button
+          variant="secondary-muted"
+          size="sm"
+          :disabled="loading || saving || refreshing"
+          label="刷新运行时"
+          icon="i-solar:restart-bold-duotone"
+          @click="proactiveStore.refreshRuntime()"
+        />
+        <Button
+          variant="secondary-muted"
+          size="sm"
+          :disabled="loading || saving || refreshing"
+          label="导入旧配置"
+          icon="i-solar:import-bold-duotone"
+          @click="proactiveStore.importLegacyConfig()"
+        />
+      </div>
+      <div v-if="lastImportSummary" :class="['rounded-lg', 'bg-neutral-50', 'p-3', 'text-xs', 'dark:bg-neutral-950/40']">
+        <p :class="['font-medium', 'text-neutral-800', 'dark:text-neutral-100']">
+          导入摘要
+        </p>
+        <p>已映射字段：{{ lastImportSummary.mappedFields.join(', ') }}</p>
+        <p>未映射字段：{{ lastImportSummary.unmappedFields.join(', ') || '无' }}</p>
+        <p>当前模式：{{ lastImportSummary.sourceMode }}{{ lastImportSummary.switchedToEmbedded ? '（已切换到 embedded）' : '' }}</p>
       </div>
     </section>
 

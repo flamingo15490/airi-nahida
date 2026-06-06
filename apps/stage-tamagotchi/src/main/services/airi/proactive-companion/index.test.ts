@@ -3,6 +3,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 import { ContextUpdateStrategy } from '@proj-airi/server-sdk'
+import { createDefaultExternalMemoryJudgementSnapshot, createDefaultExternalMemoryUsageSnapshot, createExternalMemoryReasonSnapshot } from '@proj-airi/stage-ui/stores/external-memory-shared'
+import { createDefaultProactiveCompanionRuntimeSnapshot } from '@proj-airi/stage-ui/stores/proactive-companion-shared'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const appMock = vi.hoisted(() => ({
@@ -13,6 +15,31 @@ vi.mock('electron', () => ({
   app: appMock,
 }))
 
+function createExternalMemoryManager() {
+  return {
+    getLastMemoryUsage: () => ({
+      ...createDefaultExternalMemoryUsageSnapshot(),
+      bridgeState: 'ready',
+      reason: createExternalMemoryReasonSnapshot('bridge-ready'),
+      summary: 'External memory bridge is healthy.',
+      context: {
+        ...createDefaultExternalMemoryUsageSnapshot().context,
+        sections: { userProfile: [], preferences: [], followUps: [], recentSummary: [], characterKnowledge: [] },
+      },
+    }),
+    recordMemoryObservation: async () => createDefaultExternalMemoryJudgementSnapshot(),
+    refreshMemoryJudgement: async () => createDefaultExternalMemoryJudgementSnapshot(),
+    getMemoryJudgementSnapshot: async () => createDefaultExternalMemoryJudgementSnapshot(),
+    clearMemoryCandidateLedger: async () => createDefaultExternalMemoryJudgementSnapshot(),
+    clearMemoryWriteCandidateHistory: () => createDefaultExternalMemoryUsageSnapshot(),
+    loadMemoryContext: async () => createDefaultExternalMemoryUsageSnapshot().context,
+    refreshMemoryContext: async () => createDefaultExternalMemoryUsageSnapshot().context,
+    writeFollowUpItems: async () => createDefaultExternalMemoryUsageSnapshot(),
+    writePreferencesPatch: async () => createDefaultExternalMemoryUsageSnapshot(),
+    writeRecentSummary: async () => createDefaultExternalMemoryUsageSnapshot(),
+    writeUserProfilePatch: async () => createDefaultExternalMemoryUsageSnapshot(),
+  } as never
+}
 function createExternalIntegrationsManager(state: 'ready' | 'degraded' | 'disabled' = 'ready') {
   return {
     getSnapshots: () => [{
@@ -53,9 +80,12 @@ describe('proactive companion manager', () => {
     const { createProactiveCompanionManager } = await import('./index')
     const manager = createProactiveCompanionManager({
       externalIntegrationsManager: createExternalIntegrationsManager() as never,
+      externalMemoryManager: createExternalMemoryManager(),
+      setTimeoutFn: (handler) => { setTimeout(handler, 0); return 0 as never },
+      clearTimeoutFn: () => {},
     })
 
-    expect(manager.loadConfig()).toEqual({
+    expect(manager.loadConfig()).toMatchObject({
       enabled: true,
       globalCooldownMs: 180000,
       topicCooldownMs: 600000,
@@ -63,12 +93,12 @@ describe('proactive companion manager', () => {
     })
 
     expect(manager.saveConfig({
+      ...createDefaultProactiveCompanionRuntimeSnapshot().settings,
       enabled: true,
       globalCooldownMs: 0,
       topicCooldownMs: 60000,
       intensity: 'balanced',
-    })).toEqual({
-      enabled: true,
+    })).toMatchObject({
       globalCooldownMs: 180000,
       topicCooldownMs: 180000,
       intensity: 'balanced',
@@ -76,6 +106,37 @@ describe('proactive companion manager', () => {
 
     expect(manager.getRuntimeSnapshot().state).toBe('ready')
     expect(manager.getRuntimeSnapshot().sidecarConnected).toBe(true)
+  })
+
+  it('fails gracefully when the legacy proactive config file is missing', async () => {
+    const userDataRoot = await mkdtemp(join(tmpdir(), 'airi-proactive-companion-missing-user-'))
+    const appDataRoot = await mkdtemp(join(tmpdir(), 'airi-proactive-companion-missing-appdata-'))
+    appMock.getPath.mockImplementation((name: string) => {
+      if (name === 'userData') {
+        return userDataRoot
+      }
+
+      if (name === 'appData') {
+        return appDataRoot
+      }
+
+      throw new Error(`Unexpected Electron path lookup: ${name}`)
+    })
+
+    const { createProactiveCompanionManager } = await import('./index')
+    const readLegacyConfigText = vi.fn(async () => {
+      throw new Error('ENOENT: no such file or directory')
+    })
+    const manager = createProactiveCompanionManager({
+      externalIntegrationsManager: createExternalIntegrationsManager() as never,
+      externalMemoryManager: createExternalMemoryManager(),
+      readLegacyConfigText,
+      setTimeoutFn: (handler) => { setTimeout(handler, 0); return 0 as never },
+      clearTimeoutFn: () => {},
+    })
+
+    await expect(manager.importLegacyProactiveConfig()).rejects.toThrow('未找到旧版 proactive 配置文件')
+    expect(readLegacyConfigText).toHaveBeenCalledWith(join(appDataRoot, 'ai.moeru.airi', 'proactive-companion', 'proactive-config.json'))
   })
 
   it('governs matching sidecar events with destination checks and cooldowns', async () => {
@@ -91,6 +152,9 @@ describe('proactive companion manager', () => {
     const { createProactiveCompanionManager } = await import('./index')
     const manager = createProactiveCompanionManager({
       externalIntegrationsManager: createExternalIntegrationsManager() as never,
+      externalMemoryManager: createExternalMemoryManager(),
+      setTimeoutFn: (handler) => { setTimeout(handler, 0); return 0 as never },
+      clearTimeoutFn: () => {},
     })
 
     const foreignResult = manager.evaluateSparkNotify({
@@ -177,6 +241,9 @@ describe('proactive companion manager', () => {
     const { createProactiveCompanionManager } = await import('./index')
     const manager = createProactiveCompanionManager({
       externalIntegrationsManager: createExternalIntegrationsManager() as never,
+      externalMemoryManager: createExternalMemoryManager(),
+      setTimeoutFn: (handler) => { setTimeout(handler, 0); return 0 as never },
+      clearTimeoutFn: () => {},
     })
 
     const emptyResult = manager.evaluateSparkNotify({
@@ -218,6 +285,9 @@ describe('proactive companion manager', () => {
     const { createProactiveCompanionManager } = await import('./index')
     const manager = createProactiveCompanionManager({
       externalIntegrationsManager: createExternalIntegrationsManager('degraded') as never,
+      externalMemoryManager: createExternalMemoryManager(),
+      setTimeoutFn: (handler) => { setTimeout(handler, 0); return 0 as never },
+      clearTimeoutFn: () => {},
     })
 
     const result = manager.evaluateSparkNotify({
@@ -252,6 +322,9 @@ describe('proactive companion manager', () => {
     const { createProactiveCompanionManager } = await import('./index')
     const lowManager = createProactiveCompanionManager({
       externalIntegrationsManager: createExternalIntegrationsManager() as never,
+      externalMemoryManager: createExternalMemoryManager(),
+      setTimeoutFn: (handler) => { setTimeout(handler, 0); return 0 as never },
+      clearTimeoutFn: () => {},
     })
 
     const lowResult = lowManager.evaluateSparkNotify({
@@ -272,10 +345,13 @@ describe('proactive companion manager', () => {
 
     const balancedManager = createProactiveCompanionManager({
       externalIntegrationsManager: createExternalIntegrationsManager() as never,
+      externalMemoryManager: createExternalMemoryManager(),
+      setTimeoutFn: (handler) => { setTimeout(handler, 0); return 0 as never },
+      clearTimeoutFn: () => {},
     })
     balancedManager.saveConfig({
+      ...createDefaultProactiveCompanionRuntimeSnapshot().settings,
       enabled: true,
-      globalCooldownMs: 180000,
       topicCooldownMs: 600000,
       intensity: 'balanced',
     })
@@ -310,6 +386,9 @@ describe('proactive companion manager', () => {
     const { createProactiveCompanionManager } = await import('./index')
     const manager = createProactiveCompanionManager({
       externalIntegrationsManager: createExternalIntegrationsManager() as never,
+      externalMemoryManager: createExternalMemoryManager(),
+      setTimeoutFn: (handler) => { setTimeout(handler, 0); return 0 as never },
+      clearTimeoutFn: () => {},
     })
 
     const runtimeAfterFirstRecord = manager.recordContextUpdate({

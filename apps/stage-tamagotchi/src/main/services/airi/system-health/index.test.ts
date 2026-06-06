@@ -161,6 +161,34 @@ function createManagerDependencies(overrides?: {
       refreshedAt: 200,
     }),
     saveConfig: settings => settings,
+    importLegacyProactiveConfig: async () => ({
+      mappedFields: [],
+      unmappedFields: [],
+      sourceMode: 'external-sidecar' as const,
+      switchedToEmbedded: false,
+      settings: createDefaultProactiveCompanionRuntimeSnapshot().settings,
+      importedAt: Date.now(),
+    }),
+    getProactiveCompanionSourceMode: () => 'external-sidecar' as const,
+    setProactiveCompanionSourceMode: () => createDefaultProactiveCompanionRuntimeSnapshot(),
+    triggerManualCheckIn: async () => ({
+      ok: true,
+      message: 'manual check-in',
+      runtime: createDefaultProactiveCompanionRuntimeSnapshot(),
+    }),
+    simulateProactiveSignal: async () => ({
+      ok: true,
+      message: 'simulated',
+      runtime: createDefaultProactiveCompanionRuntimeSnapshot(),
+    }),
+    pauseProactiveCompanion: async () => createDefaultProactiveCompanionRuntimeSnapshot(),
+    clearProactiveCooldowns: async () => createDefaultProactiveCompanionRuntimeSnapshot(),
+    recordVisionObservation: async () => ({
+      ok: true,
+      message: 'recorded',
+      runtime: createDefaultProactiveCompanionRuntimeSnapshot(),
+    }),
+    subscribeRuntimeEvents: () => () => {},
     ...overrides?.proactiveCompanionManager,
   }
 

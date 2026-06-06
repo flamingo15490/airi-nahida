@@ -212,21 +212,22 @@ app.whenReady().then(async () => {
       serverChannel: dependsOn.serverChannel,
     }),
   })
-  const proactiveCompanionManager = injeca.provide('modules:proactive-companion-manager', {
-    dependsOn: { externalIntegrationsManager },
-    build: async ({ dependsOn }) => createProactiveCompanionManager({
-      externalIntegrationsManager: dependsOn.externalIntegrationsManager,
-    }),
-  })
-  const nahidaPersonaManager = injeca.provide('modules:nahida-persona-manager', {
-    build: async () => createNahidaPersonaManager(),
-  })
   const externalMemoryManager = injeca.provide('modules:external-memory-manager', {
     dependsOn: { externalIntegrationsManager },
     build: async ({ dependsOn }) => createExternalMemoryManager({
       externalIntegrationsManager: dependsOn.externalIntegrationsManager,
       userDataPath: app.getPath('userData'),
     }),
+  })
+  const proactiveCompanionManager = injeca.provide('modules:proactive-companion-manager', {
+    dependsOn: { externalIntegrationsManager, externalMemoryManager },
+    build: async ({ dependsOn }) => createProactiveCompanionManager({
+      externalIntegrationsManager: dependsOn.externalIntegrationsManager,
+      externalMemoryManager: dependsOn.externalMemoryManager,
+    }),
+  })
+  const nahidaPersonaManager = injeca.provide('modules:nahida-persona-manager', {
+    build: async () => createNahidaPersonaManager(),
   })
   const companionCoordinationManager = injeca.provide('modules:companion-coordination-manager', {
     dependsOn: { externalMemoryManager, nahidaPersonaManager, proactiveCompanionManager },

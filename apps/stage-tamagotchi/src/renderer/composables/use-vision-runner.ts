@@ -6,6 +6,7 @@ import type { VisionRuntimeChannelEvent, VisionRuntimeSnapshot } from '../../sha
 import { errorMessageFrom } from '@moeru/std'
 import { VISION_WORKLOADS } from '@proj-airi/stage-ui/composables'
 import { useVisionOrchestratorStore, useVisionProcessingStore } from '@proj-airi/stage-ui/stores/modules/vision'
+import { useProactiveCompanionStore } from '@proj-airi/stage-ui/stores/proactive-companion-store'
 import { createSharedComposable, useBroadcastChannel, useLocalStorage } from '@vueuse/core'
 import { storeToRefs } from 'pinia'
 import { computed, ref, watch } from 'vue'
@@ -44,6 +45,7 @@ function createVisionRunnerInstanceId() {
 function createVisionRunner() {
   const visionProcessingStore = useVisionProcessingStore()
   const visionOrchestratorStore = useVisionOrchestratorStore()
+  const proactiveCompanionStore = useProactiveCompanionStore()
   const {
     isRunning: processingIsRunning,
     isProcessing: processingIsProcessing,
@@ -236,6 +238,15 @@ function createVisionRunner() {
         sourceId: activeSourceId.value,
         capturedAt,
         publishContext: sendContextUpdates.value,
+      })
+
+      await proactiveCompanionStore.recordVisionObservation({
+        summary: result.text,
+        workloadId: selectedWorkload.value,
+        sourceId: activeSourceId.value,
+        capturedAt,
+      }).catch((error) => {
+        console.warn('[vision-runner] Failed to record proactive vision observation:', error)
       })
 
       return { capturedAt, contextUpdates: result.contextUpdates }

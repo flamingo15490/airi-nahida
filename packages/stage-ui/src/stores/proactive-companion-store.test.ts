@@ -2,6 +2,7 @@ import { createTestingPinia } from '@pinia/testing'
 import { setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { createDefaultProactiveCompanionRuntimeSnapshot, createDefaultProactiveCompanionSettings } from './proactive-companion-shared'
 import { useProactiveCompanionStore } from './proactive-companion-store'
 
 describe('proactive companion store', () => {
@@ -32,6 +33,7 @@ describe('proactive companion store', () => {
     const store = useProactiveCompanionStore()
     store.setBridge({
       loadConfig: async () => ({
+        ...createDefaultProactiveCompanionSettings(),
         enabled: true,
         globalCooldownMs: 90000,
         topicCooldownMs: 180000,
@@ -39,13 +41,16 @@ describe('proactive companion store', () => {
       }),
       saveConfig: async settings => settings,
       getRuntimeSnapshot: async () => ({
+        ...createDefaultProactiveCompanionRuntimeSnapshot(),
         settings: {
+          ...createDefaultProactiveCompanionSettings(),
           enabled: true,
           globalCooldownMs: 90000,
           topicCooldownMs: 180000,
           intensity: 'balanced',
         },
         state: 'ready',
+        engineActive: true,
         summary: 'ready',
         sidecarConnected: true,
         sidecarSummary: 'connected',
@@ -53,13 +58,16 @@ describe('proactive companion store', () => {
         refreshedAt: 1,
       }),
       refreshRuntime: async () => ({
+        ...createDefaultProactiveCompanionRuntimeSnapshot(),
         settings: {
+          ...createDefaultProactiveCompanionSettings(),
           enabled: true,
           globalCooldownMs: 90000,
           topicCooldownMs: 180000,
           intensity: 'balanced',
         },
         state: 'ready',
+        engineActive: true,
         summary: 'refreshed',
         sidecarConnected: true,
         sidecarSummary: 'connected',
@@ -67,13 +75,16 @@ describe('proactive companion store', () => {
         refreshedAt: 2,
       }),
       clearHistory: async () => ({
+        ...createDefaultProactiveCompanionRuntimeSnapshot(),
         settings: {
+          ...createDefaultProactiveCompanionSettings(),
           enabled: true,
           globalCooldownMs: 90000,
           topicCooldownMs: 180000,
           intensity: 'balanced',
         },
         state: 'ready',
+        engineActive: true,
         summary: 'cleared',
         sidecarConnected: true,
         sidecarSummary: 'connected',
@@ -82,12 +93,14 @@ describe('proactive companion store', () => {
       }),
       recordContextUpdate: async () => ({
         settings: {
+          ...createDefaultProactiveCompanionSettings(),
           enabled: true,
           globalCooldownMs: 90000,
           topicCooldownMs: 180000,
           intensity: 'balanced',
         },
         state: 'ready',
+        engineActive: true,
         summary: 'recorded',
         sidecarConnected: true,
         sidecarSummary: 'connected',
@@ -132,12 +145,14 @@ describe('proactive companion store', () => {
         },
         runtime: {
           settings: {
+            ...createDefaultProactiveCompanionSettings(),
             enabled: true,
             globalCooldownMs: 90000,
             topicCooldownMs: 180000,
             intensity: 'balanced',
           },
           state: 'ready',
+          engineActive: true,
           summary: 'evaluated',
           sidecarConnected: true,
           sidecarSummary: 'connected',
@@ -178,6 +193,35 @@ describe('proactive companion store', () => {
           refreshedAt: 4,
         },
       }),
+
+      importLegacyConfig: async () => ({
+        mappedFields: [],
+        unmappedFields: [],
+        sourceMode: 'external-sidecar' as const,
+        switchedToEmbedded: false,
+        settings: createDefaultProactiveCompanionSettings(),
+        importedAt: Date.now(),
+      }),
+      getSourceMode: async () => 'external-sidecar' as const,
+      setSourceMode: async () => createDefaultProactiveCompanionRuntimeSnapshot(),
+      triggerManualCheckIn: async () => ({
+        ok: true,
+        message: 'manual',
+        runtime: createDefaultProactiveCompanionRuntimeSnapshot(),
+      }),
+      simulateSignal: async () => ({
+        ok: true,
+        message: 'simulated',
+        runtime: createDefaultProactiveCompanionRuntimeSnapshot(),
+      }),
+      pauseCompanion: async () => createDefaultProactiveCompanionRuntimeSnapshot(),
+      clearCooldowns: async () => createDefaultProactiveCompanionRuntimeSnapshot(),
+      recordVisionObservation: async () => ({
+        ok: true,
+        message: 'recorded',
+        runtime: createDefaultProactiveCompanionRuntimeSnapshot(),
+      }),
+
     })
 
     await store.refreshConfig()

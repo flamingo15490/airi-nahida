@@ -343,4 +343,14 @@ describe('store character', () => {
 
     expect(store.reactions).toHaveLength(0)
   })
+
+  it('strips annotations from text before passing to TTS via emitTextOutput', async () => {
+    const store = useCharacterStore()
+
+    await store.emitTextOutput('**你好**（世界）')
+
+    // The parser should receive the stripped text, not the raw markdown/annotations
+    expect(parserConsumeSpy).toHaveBeenCalledWith('你好')
+    expect(writeLiteralSpy).toHaveBeenCalledWith('你好')
+  })
 })

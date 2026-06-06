@@ -480,6 +480,43 @@ export interface ExternalMemoryUsageSnapshot {
 }
 
 /**
+ * Reports whether the frozen judgement snapshot currently contains conflicts.
+ *
+ * Use when:
+ * - Shared dashboard surfaces need a minimal conflict state
+ * - Prompt guardrails must avoid upgrading conflicted candidates into remembered facts
+ *
+ * Expects:
+ * - `judgement` follows the frozen external-memory snapshot contract
+ *
+ * Returns:
+ * - `true` when conflicted candidates or explicit conflicts are present
+ */
+export function hasConflictedMemoryCandidates(judgement?: ExternalMemoryJudgementSnapshot) {
+  return (judgement?.statusCounts.conflicted ?? 0) > 0 || (judgement?.conflicts.length ?? 0) > 0
+}
+
+/**
+ * Reports whether the latest persisted write looks like a reviewed stable-candidate writeback.
+ *
+ * Use when:
+ * - Coordination surfaces need to show whether stable candidate review recently wrote back
+ * - Shared runtime code must avoid guessing from unfrozen candidate internals
+ *
+ * Expects:
+ * - Stable candidate review writes keep the frozen `manual-candidate-review` source label
+ *
+ * Returns:
+ * - `true` when the latest successful reviewed write came from candidate review
+ */
+export function hasRecentStableCandidateWriteback(usage?: ExternalMemoryUsageSnapshot) {
+  return [usage?.lastWrite, ...(usage?.recentWrites ?? [])].some((write) => {
+    return write?.decision === 'written'
+      && write.review.candidates.some(candidate => candidate.source === 'manual-candidate-review')
+  })
+}
+
+/**
  * Maps one document kind to the frozen memory-layer contract.
  */
 export function mapDocumentKindToExternalMemoryLayer(kind: ExternalMemoryDocumentKind): ExternalMemoryLayerKind {

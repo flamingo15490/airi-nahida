@@ -2,13 +2,15 @@ import type { ExternalMemoryDocumentKind, ExternalMemoryUsageSnapshot } from '@p
 import type { NahidaPersonaSnapshot } from '@proj-airi/stage-ui/stores/nahida-persona-shared'
 import type { ProactiveCompanionRuntimeSnapshot } from '@proj-airi/stage-ui/stores/proactive-companion-shared'
 
-import { createDefaultExternalMemoryUsageSnapshot } from '@proj-airi/stage-ui/stores/external-memory-shared'
+import {
+  createDefaultExternalMemoryUsageSnapshot,
+  hasConflictedMemoryCandidates,
+  hasRecentStableCandidateWriteback,
+} from '@proj-airi/stage-ui/stores/external-memory-shared'
 import {
   createDefaultNahidaPersonaSettings,
 } from '@proj-airi/stage-ui/stores/nahida-persona-shared'
 import { createDefaultProactiveCompanionRuntimeSnapshot } from '@proj-airi/stage-ui/stores/proactive-companion-shared'
-
-import { hasConflictedMemoryCandidates, hasRecentStableCandidateWriteback } from './external-memory'
 
 export const COMPANION_COORDINATION_SURFACES = [
   'memory',
@@ -383,22 +385,38 @@ function describeProactiveActivity(runtime: ProactiveCompanionRuntimeSnapshot) {
 
   const recentDecisionCount = countRecentDecisions(runtime)
   const latestDecisionActivity = `最近判定：${describeDecision(latestDecision.decision)}。`
+  const manualTrigger = runtime.lastManualTriggerAt
+    ? `最近人工触发：${new Date(runtime.lastManualTriggerAt).toLocaleTimeString()}。`
+    : ''
+  const degradedReason = runtime.lastDegradedReason
+    ? `降级原因：${runtime.lastDegradedReason}。`
+    : ''
 
   if (recentDecisionCount > 0) {
-    return `${latestDecisionActivity}当前可查看 ${recentDecisionCount} 条最近判定。`
+    return `${latestDecisionActivity}${manualTrigger}${degradedReason}当前可查看 ${recentDecisionCount} 条最近判定。`
   }
 
-  return latestDecisionActivity
+  return `${latestDecisionActivity}${manualTrigger}${degradedReason}`
 }
 
 function describeProactiveCoverage(runtime: ProactiveCompanionRuntimeSnapshot) {
+  const sourceMode = runtime.settings.sourceMode
+  const modeLabel = sourceMode === 'embedded' ? '内建引擎' : '外部 Sidecar'
+  const signalLabel = runtime.lastSignalSource
+    ? `最近信号：${runtime.lastSignalSource}`
+    : '尚无信号记录'
+
+  if (sourceMode === 'embedded') {
+    return `模式：${modeLabel}。${signalLabel}。`
+  }
+
   if (runtime.sidecarSummary.trim()) {
-    return `sidecar：${runtime.sidecarSummary}`
+    return `模式：${modeLabel}。sidecar：${runtime.sidecarSummary}`
   }
 
   return runtime.sidecarConnected
-    ? 'sidecar：已连接。'
-    : 'sidecar：状态暂不可用。'
+    ? `模式：${modeLabel}。sidecar：已连接。`
+    : `模式：${modeLabel}。sidecar：状态暂不可用。`
 }
 
 /**

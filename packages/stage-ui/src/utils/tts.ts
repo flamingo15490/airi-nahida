@@ -2,6 +2,86 @@ import type { ReaderLike } from 'clustr'
 
 import { readGraphemeClusters } from 'clustr'
 
+/**
+ * Strips text content that should not be spoken by TTS.
+ *
+ * Removes bracket annotations, markdown formatting markers, and other
+ * non-speakable content while preserving readable text. Designed to be
+ * called once on the full text before it enters the TTS chunker.
+ *
+ * Use when:
+ * - Preparing AI-generated text for speech synthesis
+ * - Cleaning stage directions, emotion tags, and markdown from spoken output
+ *
+ * Before:
+ * - "你知道吗？（轻轻摇晃嫩叶）知识像泡泡呢~"
+ * - "[思考] 嗯…让我想想"
+ * - "**重要**的话 `code` 和 _emphasis_"
+ * - "![alt](image.png)"
+ * - "[link](https://example.com)"
+ * - "## 标题文字"
+ *
+ * After:
+ * - "你知道吗？知识像泡泡呢~"
+ * - "嗯…让我想想"
+ * - "重要的话 code 和 emphasis"
+ * - ""
+ * - "link"
+ * - "标题文字"
+ */
+export function stripTextForSpeech(text: string): string {
+  let result = text
+
+  // Markdown images: ![alt](url) → remove entirely (must run before links)
+  result = result.replace(/!\[([^\]]*)\]\([^)]*\)/g, '')
+
+  // Markdown links: [text](url) → keep text only
+  result = result.replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+
+  // Markdown bold: **text** → text
+  result = result.replace(/\*\*(.+?)\*\*/g, '$1')
+
+  // Markdown italic (asterisk): *text* → text
+  result = result.replace(/\*(.+?)\*/g, '$1')
+
+  // Markdown italic (underscore): _text_ → text
+  // Only match when surrounded by non-word boundaries to avoid matching inside_words
+  result = result.replace(/\b_(.+?)_\b/g, '$1')
+
+  // Markdown inline code: `text` → text
+  result = result.replace(/`([^`]*)`/g, '$1')
+
+  // Markdown heading prefixes: ## text → text (line-by-line)
+  result = result.replace(/^#{1,6}\s+/gm, '')
+
+  // Full-width parentheses and content: （...） → remove
+  // Iterate to handle nesting (non-greedy removes innermost first, then outer)
+  let prev = ''
+  while (prev !== result) {
+    prev = result
+    result = result.replace(/（[^（）]*）/g, '')
+  }
+
+  // Half-width parentheses and content: (...) → remove
+  // Iterate to handle nesting
+  prev = ''
+  while (prev !== result) {
+    prev = result
+    result = result.replace(/\([^()]*\)/g, '')
+  }
+
+  // Chinese corner brackets and content: 【...】 → remove
+  result = result.replace(/【[^【】]*】/g, '')
+
+  // Square brackets and content: [...] → remove
+  result = result.replace(/\[[^[\]]*\]/g, '')
+
+  // Normalize: trim and collapse consecutive whitespace
+  result = result.replace(/\s{2,}/g, ' ').trim()
+
+  return result
+}
+
 // A special character to instruct the TTS pipeline to flush
 export const TTS_FLUSH_INSTRUCTION = '\u200B'
 // This is for special literals

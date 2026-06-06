@@ -44,11 +44,17 @@ import type {
 } from '../external-memory'
 import type { NahidaPersonaSettings } from '../nahida-persona'
 import type {
+  ProactiveCompanionActionResult,
   ProactiveCompanionContextUpdateInput,
+  ProactiveCompanionDispatchEvent,
   ProactiveCompanionEvaluateResult,
+  ProactiveCompanionLegacyImportSummary,
   ProactiveCompanionRuntimeSnapshot,
   ProactiveCompanionSettings,
+  ProactiveCompanionSimulationRequest,
+  ProactiveCompanionSourceMode,
   ProactiveCompanionSparkNotifyInput,
+  ProactiveCompanionVisionObservation,
 } from '../proactive-companion'
 import type {
   StartupDiagnosticsResult,
@@ -99,6 +105,15 @@ export const electronProactiveCompanionRefreshRuntime = defineInvokeEventa<Proac
 export const electronProactiveCompanionClearHistory = defineInvokeEventa<ProactiveCompanionRuntimeSnapshot>('eventa:invoke:electron:proactive-companion:clear-history')
 export const electronProactiveCompanionEvaluateSparkNotify = defineInvokeEventa<ProactiveCompanionEvaluateResult, ProactiveCompanionSparkNotifyInput>('eventa:invoke:electron:proactive-companion:evaluate-spark-notify')
 export const electronProactiveCompanionRecordContextUpdate = defineInvokeEventa<ProactiveCompanionRuntimeSnapshot, ProactiveCompanionContextUpdateInput>('eventa:invoke:electron:proactive-companion:record-context-update')
+export const electronProactiveCompanionImportLegacyConfig = defineInvokeEventa<ProactiveCompanionLegacyImportSummary>('eventa:invoke:electron:proactive-companion:import-legacy-config')
+export const electronProactiveCompanionGetSourceMode = defineInvokeEventa<ProactiveCompanionSourceMode>('eventa:invoke:electron:proactive-companion:get-source-mode')
+export const electronProactiveCompanionSetSourceMode = defineInvokeEventa<ProactiveCompanionRuntimeSnapshot, ProactiveCompanionSourceMode>('eventa:invoke:electron:proactive-companion:set-source-mode')
+export const electronProactiveCompanionTriggerManualCheckIn = defineInvokeEventa<ProactiveCompanionActionResult>('eventa:invoke:electron:proactive-companion:trigger-manual-check-in')
+export const electronProactiveCompanionSimulateSignal = defineInvokeEventa<ProactiveCompanionActionResult, ProactiveCompanionSimulationRequest>('eventa:invoke:electron:proactive-companion:simulate-signal')
+export const electronProactiveCompanionPause = defineInvokeEventa<ProactiveCompanionRuntimeSnapshot, { durationMs?: number } | undefined>('eventa:invoke:electron:proactive-companion:pause')
+export const electronProactiveCompanionClearCooldowns = defineInvokeEventa<ProactiveCompanionRuntimeSnapshot>('eventa:invoke:electron:proactive-companion:clear-cooldowns')
+export const electronProactiveCompanionRecordVisionObservation = defineInvokeEventa<ProactiveCompanionActionResult, ProactiveCompanionVisionObservation>('eventa:invoke:electron:proactive-companion:record-vision-observation')
+export const electronProactiveCompanionRuntimeEvent = defineEventa<ProactiveCompanionDispatchEvent>('eventa:event:electron:proactive-companion:runtime-event')
 export const electronNahidaPersonaGetConfig = defineInvokeEventa<NahidaPersonaSettings>('eventa:invoke:electron:nahida-persona:get-config')
 export const electronNahidaPersonaSaveConfig = defineInvokeEventa<NahidaPersonaSettings, NahidaPersonaSettings>('eventa:invoke:electron:nahida-persona:save-config')
 export const electronCompanionCoordinationGetSnapshot = defineInvokeEventa<CompanionCoordinationSnapshot, CompanionCoordinationRefreshRequest | undefined>('eventa:invoke:electron:companion-coordination:get-snapshot')

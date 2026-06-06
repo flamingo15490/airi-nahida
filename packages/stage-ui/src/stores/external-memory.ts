@@ -5,6 +5,10 @@ import type {
   ExternalMemoryUsageSnapshot,
 } from './external-memory-shared'
 
+import {
+  hasConflictedMemoryCandidates,
+} from './external-memory-shared'
+
 function quoteBullets(lines: string[]) {
   return lines.map(line => `- ${line}`).join('\n')
 }
@@ -36,43 +40,6 @@ export function collectTrustedTurnEvidence(turn?: ExternalMemoryTurnSnapshot) {
   return dedupeMemoryLines((turn?.evidence ?? [])
     .filter(evidence => evidence.selected)
     .map(evidence => evidence.text))
-}
-
-/**
- * Reports whether the frozen judgement snapshot currently contains conflicts.
- *
- * Use when:
- * - Renderer surfaces need a minimal conflict state without inventing new vocab
- * - Prompt guardrails should avoid treating conflicted candidates as remembered facts
- *
- * Expects:
- * - `judgement` follows the frozen phase-nine snapshot contract
- *
- * Returns:
- * - `true` when conflicted candidates or explicit conflicts are present
- */
-export function hasConflictedMemoryCandidates(judgement?: ExternalMemoryJudgementSnapshot) {
-  return (judgement?.statusCounts.conflicted ?? 0) > 0 || (judgement?.conflicts.length ?? 0) > 0
-}
-
-/**
- * Reports whether the latest persisted write looks like a judged stable-candidate writeback.
- *
- * Use when:
- * - Coordination surfaces need to show whether stable candidate review recently wrote back
- * - Renderer code must avoid guessing from unfrozen candidate internals
- *
- * Expects:
- * - Stable candidate review writes keep the frozen `manual-candidate-review` source label
- *
- * Returns:
- * - `true` when the latest successful reviewed write came from candidate review
- */
-export function hasRecentStableCandidateWriteback(usage?: ExternalMemoryUsageSnapshot) {
-  return [usage?.lastWrite, ...(usage?.recentWrites ?? [])].some((write) => {
-    return write?.decision === 'written'
-      && write.review.candidates.some(candidate => candidate.source === 'manual-candidate-review')
-  })
 }
 
 /**

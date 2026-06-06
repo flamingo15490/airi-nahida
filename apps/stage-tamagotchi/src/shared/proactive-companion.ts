@@ -1,29 +1,44 @@
 import type { WebSocketEventOf } from '@proj-airi/server-sdk'
 import type {
+  ProactiveCompanionActionResult,
   ProactiveCompanionDecision,
   ProactiveCompanionDecisionSnapshot,
   ProactiveCompanionEvaluateResult,
   ProactiveCompanionEventKind,
   ProactiveCompanionEventSnapshot,
   ProactiveCompanionIntensity,
+  ProactiveCompanionLegacyImportSummary,
   ProactiveCompanionPresentation,
+  ProactiveCompanionRuntimeEvent,
   ProactiveCompanionRuntimeSnapshot,
   ProactiveCompanionRuntimeState,
   ProactiveCompanionSettings,
+  ProactiveCompanionSignalSource,
+  ProactiveCompanionSimulationKind,
+  ProactiveCompanionSimulationRequest,
+  ProactiveCompanionSourceMode,
+  ProactiveCompanionVisionObservation,
 } from '@proj-airi/stage-ui/stores/proactive-companion-shared'
 
 import {
   createDefaultProactiveCompanionRuntimeSnapshot,
   createDefaultProactiveCompanionSettings,
+  normalizeProactiveCompanionSharedSettings,
   PROACTIVE_COMPANION_DECISIONS,
   PROACTIVE_COMPANION_EVENT_KINDS,
+  PROACTIVE_COMPANION_SIGNAL_SOURCES,
+  PROACTIVE_COMPANION_SIMULATION_KINDS,
+  PROACTIVE_COMPANION_SOURCE_MODES,
 } from '@proj-airi/stage-ui/stores/proactive-companion-shared'
 import {
+  array,
   boolean,
   literal,
   number,
   object,
+  optional,
   picklist,
+  string,
 } from 'valibot'
 
 export {
@@ -31,19 +46,30 @@ export {
   createDefaultProactiveCompanionSettings,
   PROACTIVE_COMPANION_DECISIONS,
   PROACTIVE_COMPANION_EVENT_KINDS,
+  PROACTIVE_COMPANION_SIGNAL_SOURCES,
+  PROACTIVE_COMPANION_SIMULATION_KINDS,
+  PROACTIVE_COMPANION_SOURCE_MODES,
 }
 
 export type {
+  ProactiveCompanionActionResult,
   ProactiveCompanionDecision,
   ProactiveCompanionDecisionSnapshot,
   ProactiveCompanionEvaluateResult,
   ProactiveCompanionEventKind,
   ProactiveCompanionEventSnapshot,
   ProactiveCompanionIntensity,
+  ProactiveCompanionLegacyImportSummary,
   ProactiveCompanionPresentation,
+  ProactiveCompanionRuntimeEvent,
   ProactiveCompanionRuntimeSnapshot,
   ProactiveCompanionRuntimeState,
   ProactiveCompanionSettings,
+  ProactiveCompanionSignalSource,
+  ProactiveCompanionSimulationKind,
+  ProactiveCompanionSimulationRequest,
+  ProactiveCompanionSourceMode,
+  ProactiveCompanionVisionObservation,
 }
 
 export const PROACTIVE_COMPANION_CONFIG_VERSION = 1
@@ -61,12 +87,32 @@ export interface ProactiveCompanionConfigFile {
  */
 export type ProactiveCompanionSparkNotifyInput = WebSocketEventOf<'spark:notify'>
 export type ProactiveCompanionContextUpdateInput = WebSocketEventOf<'context:update'>
+export interface ProactiveCompanionDispatchEvent extends ProactiveCompanionRuntimeEvent {
+  sparkNotify?: ProactiveCompanionSparkNotifyInput
+}
 
 const proactiveCompanionSettingsSchema = object({
   enabled: boolean(),
   globalCooldownMs: number(),
   topicCooldownMs: number(),
   intensity: picklist(['low', 'balanced'] satisfies ProactiveCompanionIntensity[]),
+  sourceMode: optional(picklist([...PROACTIVE_COMPANION_SOURCE_MODES])),
+  engineEnabled: optional(boolean()),
+  idleThresholdMs: optional(number()),
+  idleCheckMinMs: optional(number()),
+  idleCheckMaxMs: optional(number()),
+  urgentCooldownMs: optional(number()),
+  memoryCooldownMs: optional(number()),
+  visionCooldownMs: optional(number()),
+  sameTopicCooldownMs: optional(number()),
+  maxProactivePerHour: optional(number()),
+  allowInterruptOnUrgent: optional(boolean()),
+  workingNudgeEnabled: optional(boolean()),
+  workingNudgeMinPauseMs: optional(number()),
+  workingNudgeCooldownMs: optional(number()),
+  visionEnabled: optional(boolean()),
+  memoryEnabled: optional(boolean()),
+  urgentKeywords: optional(array(string())),
 })
 
 export const proactiveCompanionConfigFileSchema = object({
@@ -78,32 +124,15 @@ export const proactiveCompanionConfigFileSchema = object({
  * Normalizes proactive companion settings into one conservative persisted shape.
  *
  * Before:
- * - `{ globalCooldownMs: 0, topicCooldownMs: 30_000, intensity: 'low' }`
+ * - `{ globalCooldownMs: 0, sameTopicCooldownMs: 30_000, sourceMode: 'embedded' }`
  *
  * After:
- * - `{ globalCooldownMs: 180_000, topicCooldownMs: 180_000, intensity: 'low' }`
+ * - `{ globalCooldownMs: 180_000, sameTopicCooldownMs: 1_800_000, sourceMode: 'embedded', ... }`
  */
 export function normalizeProactiveCompanionSettings(
   settings?: Partial<ProactiveCompanionSettings>,
 ): ProactiveCompanionSettings {
-  const defaults = createDefaultProactiveCompanionSettings()
-  const merged = {
-    ...defaults,
-    ...settings,
-  }
-  const globalCooldownMs = merged.globalCooldownMs > 0
-    ? merged.globalCooldownMs
-    : defaults.globalCooldownMs
-  const topicCooldownMs = merged.topicCooldownMs > 0
-    ? Math.max(merged.topicCooldownMs, globalCooldownMs)
-    : Math.max(defaults.topicCooldownMs, globalCooldownMs)
-
-  return {
-    ...merged,
-    globalCooldownMs,
-    topicCooldownMs,
-    intensity: merged.intensity === 'balanced' ? 'balanced' : 'low',
-  }
+  return normalizeProactiveCompanionSharedSettings(settings)
 }
 
 /**

@@ -11,6 +11,15 @@ const followUpsFileName = '\u5F85\u8DDF\u8FDB.md'
 const recentSummaryFileName = '\u8FD1\u671F\u6458\u8981.md'
 const characterKnowledgeDirectoryName = '\u89D2\u8272\u77E5\u8BC6\u5E93'
 const candidateLedgerFileName = 'external-memory-candidate-ledger.json'
+const defaultCharacterKnowledgeFileNames = [
+  '\u6838\u5FC3\u4EBA\u683C.md',
+  '\u8BED\u8A00\u98CE\u683C.md',
+  '\u7EA2\u7EBF\u6E05\u5355.md',
+  '\u4EBA\u9645\u5173\u7CFB.md',
+  '\u80CC\u666F\u6545\u4E8B.md',
+  '\u5916\u8C8C\u63CF\u5199.md',
+  '\u8BED\u6599\u5E93.md',
+] as const
 
 function createExternalIntegrationsManager(rootPath: string, state: 'ready' | 'degraded' | 'disabled' = 'ready') {
   return {
@@ -140,6 +149,32 @@ describe('external memory manager', () => {
     expect(unavailableContext.state).toBe('degraded')
     expect(unavailableContext.usedKinds).toEqual([])
     expect(unavailableManager.getLastMemoryUsage().bridgeState).toBe('degraded')
+  })
+
+  it('falls back to a single-character curated knowledge directory when files are intentionally category-named', async () => {
+    const rootPath = await mkdtemp(join(tmpdir(), 'airi-external-memory-single-character-'))
+    await mkdir(join(rootPath, characterKnowledgeDirectoryName), { recursive: true })
+    await writeFile(join(rootPath, userProfileFileName), '- timezone: UTC+8\n')
+    await writeFile(
+      join(rootPath, characterKnowledgeDirectoryName, defaultCharacterKnowledgeFileNames[0]),
+      '- calm and observant\n',
+    )
+    await writeFile(
+      join(rootPath, characterKnowledgeDirectoryName, defaultCharacterKnowledgeFileNames[1]),
+      '- prefers short, gentle metaphors\n',
+    )
+
+    const manager = await createManager(rootPath)
+
+    const context = await manager.refreshMemoryContext({ characterName: '纳西妲特供版' })
+
+    expect(context.usedKinds).toEqual(['user-profile', 'character-knowledge'])
+    expect(context.sections.characterKnowledge).toEqual([
+      `${defaultCharacterKnowledgeFileNames[0]}: calm and observant`,
+      `${defaultCharacterKnowledgeFileNames[1]}: prefers short, gentle metaphors`,
+    ])
+    expect(context.documents.find(item => item.kind === 'character-knowledge')?.summary).toBe('未命中角色命名文件，已按单角色资料目录选取角色知识片段。')
+    expect(context.turn.selections.find(item => item.layer === 'character-knowledge')?.selected).toBe(true)
   })
 
   it('reviews stable writes and follow-up writes with repeat thresholds, conflicts, and actionable filtering', async () => {

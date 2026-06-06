@@ -3,6 +3,7 @@ import type {
   CompanionCoordinationSurface,
 } from './companion-coordination-shared'
 import type { NahidaPersonaSnapshot } from './nahida-persona-shared'
+import type { ProactiveCompanionRuntimeSnapshot } from './proactive-companion-shared'
 
 import { errorMessageFrom } from '@moeru/std'
 import { defineStore } from 'pinia'
@@ -91,6 +92,14 @@ export const useCompanionCoordinationStore = defineStore('companion-coordination
 
   function detailRouteFor(surface: CompanionCoordinationSurface) {
     return coordinationDetailRoutes[surface]
+  }
+
+  function syncProactiveRuntime(runtimeSnapshot: ProactiveCompanionRuntimeSnapshot) {
+    desktopSnapshot.value = cloneSnapshot(composeCompanionCoordinationSnapshot({
+      memoryUsage: externalMemoryStore.usage,
+      persona: nahidaPersonaStore.snapshot,
+      proactiveRuntime: runtimeSnapshot,
+    }))
   }
 
   async function refresh() {
@@ -198,5 +207,6 @@ export const useCompanionCoordinationStore = defineStore('companion-coordination
     refresh,
     refreshForSparkNotify,
     setBridge,
+    syncProactiveRuntime,
   }
 })
