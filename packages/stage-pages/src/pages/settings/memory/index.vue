@@ -335,6 +335,161 @@ onMounted(() => {
       </div>
     </section>
 
+    <section :class="['flex', 'flex-col', 'gap-3', 'rounded-xl', 'border', 'border-neutral-200', 'bg-white/80', 'p-4', 'dark:border-neutral-800', 'dark:bg-neutral-900/40']">
+      <div :class="['flex', 'flex-col', 'gap-1']">
+        <h3 :class="['text-sm', 'font-semibold']">
+          Dual Summary / Explainability
+        </h3>
+        <p :class="['text-xs', 'text-neutral-500', 'dark:text-neutral-400']">
+          Consolidated view of canonical and persona summaries, recall and memorize decisions, and reinforcement timing.
+        </p>
+      </div>
+
+      <div :class="['grid', 'gap-3', 'lg:grid-cols-2']">
+        <article :class="['flex', 'flex-col', 'gap-2', 'rounded-lg', 'border', 'border-neutral-200', 'bg-neutral-50/80', 'p-3', 'dark:border-neutral-800', 'dark:bg-neutral-950/40']">
+          <h4 :class="['text-sm', 'font-semibold']">
+            Canonical summary
+          </h4>
+          <p :class="['text-xs', 'text-neutral-600', 'dark:text-neutral-300']">
+            {{ turnSnapshot.summary || 'No canonical summary recorded yet.' }}
+          </p>
+          <div :class="['text-xs', 'text-neutral-500', 'dark:text-neutral-400']">
+            Source window: {{ turnSnapshot.usedLayers.length > 0 ? turnSnapshot.usedLayers.map(formatLayerLabel).join(', ') : 'None' }}
+          </div>
+          <div :class="['text-xs', 'text-neutral-500', 'dark:text-neutral-400']">
+            Snapshot time: {{ formatTimestamp(turnSnapshot.readAt) }}
+          </div>
+        </article>
+
+        <article :class="['flex', 'flex-col', 'gap-2', 'rounded-lg', 'border', 'border-neutral-200', 'bg-neutral-50/80', 'p-3', 'dark:border-neutral-800', 'dark:bg-neutral-950/40']">
+          <h4 :class="['text-sm', 'font-semibold']">
+            Persona summary
+          </h4>
+          <p :class="['text-xs', 'text-neutral-600', 'dark:text-neutral-300']">
+            {{ nahidaSummary || 'Persona layer is not active.' }}
+          </p>
+          <div :class="['text-xs', 'text-neutral-500', 'dark:text-neutral-400']">
+            Nahida active: {{ nahidaActive ? 'Yes' : 'No' }}
+          </div>
+        </article>
+      </div>
+
+      <div :class="['grid', 'gap-2', 'rounded-lg', 'bg-neutral-50', 'p-3', 'text-xs', 'dark:bg-neutral-950/40', 'md:grid-cols-3']">
+        <div :class="['text-neutral-600', 'dark:text-neutral-300']">
+          <span :class="['font-medium', 'text-neutral-800', 'dark:text-neutral-100']">Summary quality:</span>
+          {{ judgementStatusEntries.map(entry => `${entry.label} ${entry.count}`).join(', ') }}
+        </div>
+        <div :class="['text-neutral-600', 'dark:text-neutral-300']">
+          <span :class="['font-medium', 'text-neutral-800', 'dark:text-neutral-100']">Total observations:</span>
+          {{ judgementObservationCount }}
+        </div>
+        <div :class="['text-neutral-600', 'dark:text-neutral-300']">
+          <span :class="['font-medium', 'text-neutral-800', 'dark:text-neutral-100']">Judgement refreshed:</span>
+          {{ formatTimestamp(judgementSnapshot.refreshedAt) }}
+        </div>
+      </div>
+
+      <div :class="['grid', 'gap-3', 'lg:grid-cols-2']">
+        <article :class="['flex', 'flex-col', 'gap-2', 'rounded-lg', 'border', 'border-neutral-200', 'bg-neutral-50/80', 'p-3', 'dark:border-neutral-800', 'dark:bg-neutral-950/40']">
+          <h4 :class="['text-sm', 'font-semibold']">
+            Latest recall decision
+          </h4>
+          <div
+            v-for="entry in layerSummaries"
+            :key="entry.layer"
+            :class="['flex', 'items-start', 'justify-between', 'gap-2', 'rounded', 'border', 'border-neutral-200', 'bg-white/80', 'px-2', 'py-1.5', 'dark:border-neutral-800', 'dark:bg-neutral-900/40']"
+          >
+            <div :class="['font-medium', 'text-neutral-800', 'dark:text-neutral-100']">
+              {{ entry.label }}
+            </div>
+            <span
+              :class="[
+                'inline-flex', 'items-center', 'rounded-full', 'px-2', 'py-0.5', 'text-[11px]', 'font-medium',
+                entry.selected ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300' : 'bg-amber-500/15 text-amber-700 dark:text-amber-300',
+              ]"
+            >
+              {{ entry.selected ? 'Selected' : 'Suppressed' }}
+            </span>
+          </div>
+          <div
+            v-if="layerSummaries.length === 0"
+            :class="['text-xs', 'text-neutral-500', 'dark:text-neutral-400']"
+          >
+            No recall decisions recorded yet.
+          </div>
+        </article>
+
+        <article :class="['flex', 'flex-col', 'gap-2', 'rounded-lg', 'border', 'border-neutral-200', 'bg-neutral-50/80', 'p-3', 'dark:border-neutral-800', 'dark:bg-neutral-950/40']">
+          <h4 :class="['text-sm', 'font-semibold']">
+            Latest memorize decision
+          </h4>
+          <div :class="['grid', 'gap-1', 'text-xs']">
+            <div :class="['text-neutral-600', 'dark:text-neutral-300']">
+              <span :class="['font-medium', 'text-neutral-800', 'dark:text-neutral-100']">Decision:</span>
+              {{ formatWriteDecision(writeReviewSnapshot.decision) }}
+            </div>
+            <div :class="['text-neutral-600', 'dark:text-neutral-300']">
+              <span :class="['font-medium', 'text-neutral-800', 'dark:text-neutral-100']">Reviewed:</span>
+              {{ formatTimestamp(writeReviewSnapshot.reviewedAt) }}
+            </div>
+            <div :class="['text-neutral-600', 'dark:text-neutral-300']">
+              <span :class="['font-medium', 'text-neutral-800', 'dark:text-neutral-100']">Summary:</span>
+              {{ writeReviewSnapshot.summary }}
+            </div>
+          </div>
+          <div v-if="latestPersistedWrite" :class="['mt-1', 'text-xs', 'text-neutral-600', 'dark:text-neutral-300']">
+            <span :class="['font-medium']">Last written:</span>
+            {{ t(`settings.pages.memory.documents.${latestPersistedWrite.kind}.title`) }} at {{ formatTimestamp(latestPersistedWrite.writtenAt) }}
+          </div>
+        </article>
+      </div>
+
+      <article :class="['flex', 'flex-col', 'gap-2', 'rounded-lg', 'border', 'border-neutral-200', 'bg-neutral-50/80', 'p-3', 'dark:border-neutral-800', 'dark:bg-neutral-950/40']">
+        <h4 :class="['text-sm', 'font-semibold']">
+          Reinforcement / access timing
+        </h4>
+        <div
+          v-if="recentJudgementCandidates.length > 0"
+          :class="['grid', 'gap-2', 'md:grid-cols-2']"
+        >
+          <div
+            v-for="candidate in recentJudgementCandidates.slice(0, 4)"
+            :key="candidate.id"
+            :class="['rounded', 'border', 'border-neutral-200', 'bg-white/80', 'p-2', 'text-xs', 'dark:border-neutral-800', 'dark:bg-neutral-900/40']"
+          >
+            <div :class="['flex', 'items-start', 'justify-between', 'gap-1']">
+              <span :class="['font-medium', 'text-neutral-800', 'dark:text-neutral-100']">
+                {{ candidate.text.slice(0, 40) }}{{ candidate.text.length > 40 ? '...' : '' }}
+              </span>
+              <span
+                :class="[
+                  'inline-flex', 'items-center', 'rounded-full', 'px-1.5', 'py-0.5', 'text-[10px]', 'font-medium',
+                  candidateStatusTone(candidate.status),
+                ]"
+              >
+                {{ formatCandidateStatus(candidate.status) }}
+              </span>
+            </div>
+            <div :class="['mt-1', 'text-neutral-500', 'dark:text-neutral-400']">
+              Observations: {{ candidate.observationCount }}
+            </div>
+            <div :class="['text-neutral-500', 'dark:text-neutral-400']">
+              First seen: {{ formatTimestamp(candidate.firstObservedAt) }}
+            </div>
+            <div :class="['text-neutral-500', 'dark:text-neutral-400']">
+              Last seen: {{ formatTimestamp(candidate.lastObservedAt) }}
+            </div>
+          </div>
+        </div>
+        <div
+          v-else
+          :class="['text-xs', 'text-neutral-500', 'dark:text-neutral-400']"
+        >
+          No candidate reinforcement data available.
+        </div>
+      </article>
+    </section>
+
     <section :class="['grid', 'gap-3', 'md:grid-cols-2']">
       <article
         v-for="document in context?.documents ?? []"

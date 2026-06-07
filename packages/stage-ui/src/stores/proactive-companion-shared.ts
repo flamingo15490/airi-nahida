@@ -19,6 +19,39 @@ export type ProactiveCompanionIntensity = 'low' | 'balanced'
 export type ProactiveCompanionPresentation = 'light-prompt' | 'prominent-reminder' | 'silent'
 
 /**
+ * Presence state derived from the latest screen-context runtime snapshot.
+ */
+export type ScreenContextPresence = 'active' | 'away' | 'unknown'
+
+/**
+ * Optional hint explaining why the proactive governance layer suppressed or
+ * deferred a sidecar event based on screen-context conditions.
+ *
+ * These hints are advisory only: they annotate the suppress/defer reason but
+ * do not change the final deliver/suppress/defer decision.
+ */
+export type ProactiveCompanionScreenContextHint = 'screen-stale' | 'presence-away' | 'same-source-cooldown' | 'sensitive-visual-context'
+
+/**
+ * Minimal screen-context provider accepted by the proactive governance manager.
+ *
+ * Use when:
+ * - The desktop runtime wants proactive gating to react to user presence and
+ *   screen-context freshness without importing the full vision stores
+ *
+ * Expects:
+ * - `presence` returns one of `'active'`, `'away'`, or `'unknown'`
+ * - `freshnessMs` returns the age in milliseconds since the last screen-context
+ *   snapshot update, or `null` when no snapshot has been recorded
+ */
+export interface ScreenContextProvider {
+  /** Current user presence derived from screen-context capture. */
+  getPresence: () => ScreenContextPresence
+  /** Milliseconds since the latest screen-context update, or `null` if never. */
+  getFreshnessMs: () => number | null
+}
+
+/**
  * Persisted desktop-only settings that govern incoming proactive sidecar events.
  */
 export interface ProactiveCompanionSettings {
@@ -78,6 +111,8 @@ export interface ProactiveCompanionDecisionSnapshot {
   sidecarReady: boolean
   /** Optional next eligible time for cooldown-related outcomes. */
   cooldownUntil?: number
+  /** Optional screen-context hint that annotated a suppress/defer reason. */
+  screenContextHint?: ProactiveCompanionScreenContextHint
   /** UNIX timestamp of the final decision. */
   decidedAt: number
 }

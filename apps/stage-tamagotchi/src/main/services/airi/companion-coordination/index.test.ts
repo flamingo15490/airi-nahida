@@ -339,4 +339,100 @@ describe('companion coordination manager', () => {
     expect(proactiveSurface?.overview.updatedAt).toBe(60)
     expect(result.persona.isActive).toBe(true)
   })
+
+  it('includes screenContext explainability block from the screen context provider', async () => {
+    const proactiveRuntime = createProactiveRuntime()
+    const proactiveCompanionManager: ProactiveCompanionManager = {
+      loadConfig: () => proactiveRuntime.settings,
+      saveConfig: settings => settings,
+      getRuntimeSnapshot: () => proactiveRuntime,
+      refreshRuntime: async () => proactiveRuntime,
+      clearHistory: async () => proactiveRuntime,
+      evaluateSparkNotify: () => ({
+        managed: false,
+        runtime: proactiveRuntime,
+      }),
+      recordContextUpdate: () => proactiveRuntime,
+    }
+
+    const manager = createCompanionCoordinationManager({
+      externalMemoryManager: createExternalMemoryManager(),
+      nahidaPersonaManager: createNahidaPersonaManager(),
+      proactiveCompanionManager,
+      screenContextProvider: {
+        getPresence: () => 'active',
+        getFreshnessMs: () => 30_000,
+      },
+    })
+
+    const snapshot = await manager.refresh({
+      activeCardName: 'Nahida',
+      activeDisplayModelName: 'Nahida',
+    })
+
+    expect(snapshot.screenContext).toBeDefined()
+    expect(snapshot.screenContext?.summary).toContain('\u5C4F\u5E55\u4E0A\u4E0B\u6587\u5F53\u524D\u53EF\u7528')
+    expect(snapshot.screenContext?.reason).toContain('active')
+  })
+
+  it('includes memoryJudgement explainability block from the external memory manager', async () => {
+    const proactiveRuntime = createProactiveRuntime()
+    const proactiveCompanionManager: ProactiveCompanionManager = {
+      loadConfig: () => proactiveRuntime.settings,
+      saveConfig: settings => settings,
+      getRuntimeSnapshot: () => proactiveRuntime,
+      refreshRuntime: async () => proactiveRuntime,
+      clearHistory: async () => proactiveRuntime,
+      evaluateSparkNotify: () => ({
+        managed: false,
+        runtime: proactiveRuntime,
+      }),
+      recordContextUpdate: () => proactiveRuntime,
+    }
+
+    const manager = createCompanionCoordinationManager({
+      externalMemoryManager: createExternalMemoryManager(),
+      nahidaPersonaManager: createNahidaPersonaManager(),
+      proactiveCompanionManager,
+    })
+
+    const snapshot = await manager.refresh({
+      activeCardName: 'Nahida',
+      activeDisplayModelName: 'Nahida',
+    })
+
+    expect(snapshot.memoryJudgement).toBeDefined()
+    expect(snapshot.memoryJudgement?.summary).toBeDefined()
+    expect(typeof snapshot.memoryJudgement?.summary).toBe('string')
+  })
+
+  it('returns degraded screenContext block when no screen context provider is configured', async () => {
+    const proactiveRuntime = createProactiveRuntime()
+    const proactiveCompanionManager: ProactiveCompanionManager = {
+      loadConfig: () => proactiveRuntime.settings,
+      saveConfig: settings => settings,
+      getRuntimeSnapshot: () => proactiveRuntime,
+      refreshRuntime: async () => proactiveRuntime,
+      clearHistory: async () => proactiveRuntime,
+      evaluateSparkNotify: () => ({
+        managed: false,
+        runtime: proactiveRuntime,
+      }),
+      recordContextUpdate: () => proactiveRuntime,
+    }
+
+    const manager = createCompanionCoordinationManager({
+      externalMemoryManager: createExternalMemoryManager(),
+      nahidaPersonaManager: createNahidaPersonaManager(),
+      proactiveCompanionManager,
+    })
+
+    const snapshot = await manager.refresh({
+      activeCardName: 'Nahida',
+      activeDisplayModelName: 'Nahida',
+    })
+
+    expect(snapshot.screenContext).toBeDefined()
+    expect(snapshot.screenContext?.summary).toContain('\u4E0D\u53EF\u7528')
+  })
 })

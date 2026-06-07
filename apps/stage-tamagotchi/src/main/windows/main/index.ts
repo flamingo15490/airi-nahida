@@ -11,6 +11,7 @@ import type { GodotStageManager } from '../../services/airi/godot-stage'
 import type { McpStdioManager } from '../../services/airi/mcp-servers'
 import type { NahidaPersonaManager } from '../../services/airi/nahida-persona'
 import type { ProactiveCompanionManager } from '../../services/airi/proactive-companion'
+import type { ScreenContextManager } from '../../services/airi/screen-context'
 import type { AutoUpdater } from '../../services/electron/auto-updater'
 import type { NoticeWindowManager } from '../notice'
 import type { OnboardingWindowManager } from '../onboarding'
@@ -67,6 +68,7 @@ export async function setupMainWindow(params: {
   externalIntegrationsManager: ExternalIntegrationsManager
   proactiveCompanionManager: ProactiveCompanionManager
   externalMemoryManager: ExternalMemoryManager
+  screenContextManager: ScreenContextManager
   nahidaPersonaManager: NahidaPersonaManager
   companionCoordinationManager: CompanionCoordinationManager
   i18n: I18n
@@ -199,6 +201,7 @@ export async function setupMainWindow(params: {
     externalIntegrationsManager: params.externalIntegrationsManager,
     proactiveCompanionManager: params.proactiveCompanionManager,
     externalMemoryManager: params.externalMemoryManager,
+    screenContextManager: params.screenContextManager,
     nahidaPersonaManager: params.nahidaPersonaManager,
     companionCoordinationManager: params.companionCoordinationManager,
     i18n: params.i18n,

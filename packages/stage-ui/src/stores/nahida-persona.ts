@@ -444,6 +444,8 @@ export function composeNahidaPersonaSupplement(params: {
     quoteSection('Taboos:', [
       ...nahidaPersonaAsset.expressionStyle.antiPatterns,
       ...nahidaPersonaAsset.taboos,
+      'Do not treat stale or absent screen-context data as a reliable memory source. Screen-context snapshots only reflect what the vision system captured at a specific moment and may not represent the current situation.',
+      'If screen-context freshness is degraded or the user presence is detected as away, respond with less certainty about what the user is currently doing or looking at.',
     ]),
   ].join('\n')
 }

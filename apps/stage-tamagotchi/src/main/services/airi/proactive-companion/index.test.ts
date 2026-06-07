@@ -365,4 +365,160 @@ describe('proactive companion manager', () => {
 
     expect(runtimeAfterDuplicateRecord.recentDecisions).toHaveLength(1)
   })
+
+  it('produces presence-away screenContextHint on suppressed decisions when screen presence is away', async () => {
+    const userDataRoot = await mkdtemp(join(tmpdir(), 'airi-proactive-companion-presence-away-'))
+    appMock.getPath.mockImplementation((name: string) => {
+      if (name === 'userData') {
+        return userDataRoot
+      }
+
+      throw new Error(`Unexpected Electron path lookup: ${name}`)
+    })
+
+    const { createProactiveCompanionManager } = await import('./index')
+    const manager = createProactiveCompanionManager({
+      externalIntegrationsManager: createExternalIntegrationsManager() as never,
+      screenContextProvider: {
+        getPresence: () => 'away',
+        getFreshnessMs: () => 1000,
+      },
+    })
+
+    // Deliver a first event so global cooldown activates
+    manager.evaluateSparkNotify({
+      type: 'spark:notify',
+      source: 'plugin:local.proactive-companion',
+      data: {
+        id: 'sidecar-presence-away-first',
+        eventId: 'sidecar-presence-away-first',
+        kind: 'reminder',
+        urgency: 'soon',
+        headline: 'First reminder',
+        destinations: ['character'],
+      },
+    })
+
+    // Second event should be suppressed by global cooldown
+    const result = manager.evaluateSparkNotify({
+      type: 'spark:notify',
+      source: 'plugin:local.proactive-companion',
+      data: {
+        id: 'sidecar-presence-away-second',
+        eventId: 'sidecar-presence-away-second',
+        kind: 'reminder',
+        urgency: 'soon',
+        headline: 'Second reminder',
+        destinations: ['character'],
+      },
+    })
+
+    expect(result.managed).toBe(true)
+    expect(result.decision?.decision).toBe('suppressed')
+    expect(result.decision?.screenContextHint).toBe('presence-away')
+  })
+
+  it('produces screen-stale screenContextHint on suppressed decisions when screen context is stale', async () => {
+    const userDataRoot = await mkdtemp(join(tmpdir(), 'airi-proactive-companion-screen-stale-'))
+    appMock.getPath.mockImplementation((name: string) => {
+      if (name === 'userData') {
+        return userDataRoot
+      }
+
+      throw new Error(`Unexpected Electron path lookup: ${name}`)
+    })
+
+    const { createProactiveCompanionManager } = await import('./index')
+    const manager = createProactiveCompanionManager({
+      externalIntegrationsManager: createExternalIntegrationsManager() as never,
+      screenContextProvider: {
+        getPresence: () => 'active',
+        getFreshnessMs: () => 10 * 60 * 1000,
+      },
+    })
+
+    // Deliver a first event so global cooldown activates
+    manager.evaluateSparkNotify({
+      type: 'spark:notify',
+      source: 'plugin:local.proactive-companion',
+      data: {
+        id: 'sidecar-stale-first',
+        eventId: 'sidecar-stale-first',
+        kind: 'reminder',
+        urgency: 'soon',
+        headline: 'First reminder',
+        destinations: ['character'],
+      },
+    })
+
+    // Second event should be suppressed by global cooldown
+    const result = manager.evaluateSparkNotify({
+      type: 'spark:notify',
+      source: 'plugin:local.proactive-companion',
+      data: {
+        id: 'sidecar-stale-second',
+        eventId: 'sidecar-stale-second',
+        kind: 'reminder',
+        urgency: 'soon',
+        headline: 'Second reminder',
+        destinations: ['character'],
+      },
+    })
+
+    expect(result.managed).toBe(true)
+    expect(result.decision?.decision).toBe('suppressed')
+    expect(result.decision?.screenContextHint).toBe('screen-stale')
+  })
+
+  it('produces no screenContextHint on suppressed decisions when screen context is active and fresh', async () => {
+    const userDataRoot = await mkdtemp(join(tmpdir(), 'airi-proactive-companion-screen-fresh-'))
+    appMock.getPath.mockImplementation((name: string) => {
+      if (name === 'userData') {
+        return userDataRoot
+      }
+
+      throw new Error(`Unexpected Electron path lookup: ${name}`)
+    })
+
+    const { createProactiveCompanionManager } = await import('./index')
+    const manager = createProactiveCompanionManager({
+      externalIntegrationsManager: createExternalIntegrationsManager() as never,
+      screenContextProvider: {
+        getPresence: () => 'active',
+        getFreshnessMs: () => 30_000,
+      },
+    })
+
+    // Deliver a first event so global cooldown activates
+    manager.evaluateSparkNotify({
+      type: 'spark:notify',
+      source: 'plugin:local.proactive-companion',
+      data: {
+        id: 'sidecar-fresh-first',
+        eventId: 'sidecar-fresh-first',
+        kind: 'reminder',
+        urgency: 'soon',
+        headline: 'First reminder',
+        destinations: ['character'],
+      },
+    })
+
+    // Second event should be suppressed by global cooldown
+    const result = manager.evaluateSparkNotify({
+      type: 'spark:notify',
+      source: 'plugin:local.proactive-companion',
+      data: {
+        id: 'sidecar-fresh-second',
+        eventId: 'sidecar-fresh-second',
+        kind: 'reminder',
+        urgency: 'soon',
+        headline: 'Second reminder',
+        destinations: ['character'],
+      },
+    })
+
+    expect(result.managed).toBe(true)
+    expect(result.decision?.decision).toBe('suppressed')
+    expect(result.decision?.screenContextHint).toBeUndefined()
+  })
 })

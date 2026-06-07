@@ -3,6 +3,7 @@ import { Alert, ErrorContainer, RadioCardManySelect, RadioCardSimple } from '@pr
 import { useAnalytics } from '@proj-airi/stage-ui/composables'
 import { useVisionProcessingStore, useVisionStore } from '@proj-airi/stage-ui/stores/modules/vision'
 import { useProvidersStore } from '@proj-airi/stage-ui/stores/providers'
+import { useScreenContextStore } from '@proj-airi/stage-ui/stores/screen-context'
 import { FieldCheckbox, FieldRange } from '@proj-airi/ui'
 import { storeToRefs } from 'pinia'
 import { computed, watch } from 'vue'
@@ -12,6 +13,8 @@ import { RouterLink } from 'vue-router'
 const providersStore = useProvidersStore()
 const visionStore = useVisionStore()
 const visionProcessingStore = useVisionProcessingStore()
+const screenContextStore = useScreenContextStore()
+const { snapshot: screenContext, captureFreshness, contextFreshness } = storeToRefs(screenContextStore)
 const { persistedChatProvidersMetadata, configuredProviders } = storeToRefs(providersStore)
 const {
   activeProvider,
@@ -392,6 +395,103 @@ function formatRelativeTime(timestamp: number | null) {
               Last update {{ formattedLastContextUpdate }}
             </div>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <div :class="['rounded-xl', 'bg-neutral-50', 'p-4', 'dark:bg-[rgba(0,0,0,0.3)]']">
+      <div :class="['flex', 'flex-col', 'gap-4']">
+        <div>
+          <h2 :class="['text-lg', 'text-neutral-500', 'md:text-2xl', 'dark:text-neutral-500']">
+            Screen Context
+          </h2>
+          <div :class="['text-neutral-400', 'dark:text-neutral-400']">
+            Read-only overview of the current screen-context state composed from vision capture and context processing.
+          </div>
+        </div>
+
+        <div :class="['grid', 'gap-4', 'md:grid-cols-3']">
+          <div :class="['rounded-lg', 'border', 'border-neutral-200', 'bg-white', 'p-3', 'dark:border-neutral-800', 'dark:bg-neutral-900']">
+            <div :class="['text-xs', 'uppercase', 'tracking-wide', 'text-neutral-400']">
+              Source mode
+            </div>
+            <div :class="['text-sm', 'font-medium', 'text-neutral-600', 'dark:text-neutral-200']">
+              {{ screenContext.sourceMode || 'Unconfigured' }}
+            </div>
+            <div :class="['text-xs', 'text-neutral-400']">
+              Model: {{ screenContext.sourceModel || 'None' }}
+            </div>
+          </div>
+
+          <div :class="['rounded-lg', 'border', 'border-neutral-200', 'bg-white', 'p-3', 'dark:border-neutral-800', 'dark:bg-neutral-900']">
+            <div :class="['text-xs', 'uppercase', 'tracking-wide', 'text-neutral-400']">
+              Current presence
+            </div>
+            <div :class="['text-sm', 'font-medium', 'text-neutral-600', 'dark:text-neutral-200']">
+              {{ screenContext.isRunning ? 'Active' : 'Idle' }}
+            </div>
+            <div :class="['text-xs', 'text-neutral-400']">
+              Live stream: {{ screenContext.hasLiveStream ? 'Yes' : 'No' }}
+            </div>
+          </div>
+
+          <div :class="['rounded-lg', 'border', 'border-neutral-200', 'bg-white', 'p-3', 'dark:border-neutral-800', 'dark:bg-neutral-900']">
+            <div :class="['text-xs', 'uppercase', 'tracking-wide', 'text-neutral-400']">
+              Freshness
+            </div>
+            <div :class="['text-sm', 'font-medium', 'text-neutral-600', 'dark:text-neutral-200']">
+              Capture: {{ captureFreshness }}
+            </div>
+            <div :class="['text-xs', 'text-neutral-400']">
+              Context: {{ contextFreshness }}
+            </div>
+          </div>
+        </div>
+
+        <div :class="['grid', 'gap-4', 'md:grid-cols-2']">
+          <div :class="['rounded-lg', 'border', 'border-neutral-200', 'bg-white', 'p-3', 'dark:border-neutral-800', 'dark:bg-neutral-900']">
+            <div :class="['text-xs', 'uppercase', 'tracking-wide', 'text-neutral-400']">
+              Latest screen peek
+            </div>
+            <div :class="['text-sm', 'font-medium', 'text-neutral-600', 'dark:text-neutral-200']">
+              {{ screenContext.captureCount }} captures
+            </div>
+            <div :class="['text-xs', 'text-neutral-400']">
+              Rate: {{ screenContext.captureRatePerMinute }}/min
+            </div>
+            <div :class="['text-xs', 'text-neutral-400']">
+              Avg processing: {{ screenContext.averageProcessingMs.toFixed(0) }}ms
+            </div>
+          </div>
+
+          <div :class="['rounded-lg', 'border', 'border-neutral-200', 'bg-white', 'p-3', 'dark:border-neutral-800', 'dark:bg-neutral-900']">
+            <div :class="['text-xs', 'uppercase', 'tracking-wide', 'text-neutral-400']">
+              Latest screen usage context
+            </div>
+            <div :class="['text-sm', 'font-medium', 'text-neutral-600', 'dark:text-neutral-200']">
+              {{ screenContext.contextUpdateCount }} updates
+            </div>
+            <div :class="['text-xs', 'text-neutral-400']">
+              Rate: {{ screenContext.contextUpdateRatePerMinute }}/min
+            </div>
+            <div v-if="screenContext.lastError" :class="['mt-1', 'text-xs', 'text-red-500']">
+              Error: {{ screenContext.lastError }}
+            </div>
+          </div>
+        </div>
+
+        <div :class="['flex', 'flex-wrap', 'gap-2']">
+          <button
+            type="button"
+            :class="[
+              'inline-flex', 'items-center', 'rounded-full', 'border', 'border-emerald-300/70',
+              'bg-emerald-50/80', 'px-3', 'py-1.5', 'text-xs', 'font-medium', 'text-emerald-800',
+              'transition', 'dark:border-emerald-900/60', 'dark:bg-emerald-950/30', 'dark:text-emerald-200',
+            ]"
+            @click="screenContextStore.resetHistory()"
+          >
+            Clear history
+          </button>
         </div>
       </div>
     </div>

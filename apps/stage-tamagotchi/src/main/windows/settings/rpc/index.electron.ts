@@ -10,6 +10,7 @@ import type { GodotStageManager } from '../../../services/airi/godot-stage'
 import type { McpStdioManager } from '../../../services/airi/mcp-servers'
 import type { NahidaPersonaManager } from '../../../services/airi/nahida-persona'
 import type { ProactiveCompanionManager } from '../../../services/airi/proactive-companion'
+import type { ScreenContextManager } from '../../../services/airi/screen-context'
 import type { AutoUpdater } from '../../../services/electron/auto-updater'
 import type { GlobalShortcutService } from '../../../services/electron/global-shortcut'
 import type { DevtoolsWindowManager } from '../../devtools'
@@ -28,6 +29,7 @@ import { createGodotStageService } from '../../../services/airi/godot-stage'
 import { createMcpServersService } from '../../../services/airi/mcp-servers'
 import { createNahidaPersonaService } from '../../../services/airi/nahida-persona'
 import { createProactiveCompanionService } from '../../../services/airi/proactive-companion'
+import { createScreenContextService } from '../../../services/airi/screen-context'
 import { createWidgetsService } from '../../../services/airi/widgets'
 import { createAutoUpdaterService } from '../../../services/electron'
 import { setupBaseWindowElectronInvokes } from '../../shared/window'
@@ -42,6 +44,7 @@ export async function setupSettingsWindowInvokes(params: {
   mcpStdioManager: McpStdioManager
   externalIntegrationsManager: ExternalIntegrationsManager
   proactiveCompanionManager: ProactiveCompanionManager
+  screenContextManager: ScreenContextManager
   externalMemoryManager: ExternalMemoryManager
   nahidaPersonaManager: NahidaPersonaManager
   companionCoordinationManager: CompanionCoordinationManager
@@ -64,6 +67,7 @@ export async function setupSettingsWindowInvokes(params: {
   createExternalIntegrationsService({ context, manager: params.externalIntegrationsManager })
   createProactiveCompanionService({ context, manager: params.proactiveCompanionManager })
   createExternalMemoryService({ context, manager: params.externalMemoryManager })
+  createScreenContextService({ context, manager: params.screenContextManager })
   createNahidaPersonaService({ context, manager: params.nahidaPersonaManager })
   createCompanionCoordinationService({ context, manager: params.companionCoordinationManager })
   createGodotStageService({ context, manager: params.godotStageManager, window: params.settingsWindow })

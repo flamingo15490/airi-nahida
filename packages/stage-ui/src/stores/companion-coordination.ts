@@ -32,11 +32,26 @@ export function composeCompanionCoordinationSupplement(snapshot?: CompanionCoord
     return `${surface.title}: ${surface.status}. ${surface.overview.reason} Activity: ${surface.overview.activity} Coverage: ${surface.overview.coverage}`
   })
 
+  const explainability: string[] = []
+
+  if (snapshot.screenContext) {
+    explainability.push(`Screen context: ${snapshot.screenContext.summary}`)
+  }
+
+  if (snapshot.memoryJudgement) {
+    explainability.push(`Memory judgement: ${snapshot.memoryJudgement.summary}`)
+  }
+
+  const explainabilityBlock = explainability.length > 0
+    ? ['', 'Subsystem explainability:', quoteBullets(explainability)].join('\n')
+    : ''
+
   return [
     '[Companion Coordination Supplement]',
     'The following frozen phase-six coordination snapshot summarizes memory, persona, and proactive readiness for this turn.',
     `Overall: ${snapshot.status}. ${snapshot.reason.message}`,
     '',
     quoteBullets(lines),
-  ].join('\n')
+    explainabilityBlock,
+  ].filter(Boolean).join('\n')
 }

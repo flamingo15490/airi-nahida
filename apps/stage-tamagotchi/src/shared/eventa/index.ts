@@ -51,6 +51,10 @@ import type {
   ProactiveCompanionSparkNotifyInput,
 } from '../proactive-companion'
 import type {
+  ScreenContextRuntimeSnapshot,
+  ScreenContextSettings,
+} from '../screen-context'
+import type {
   StartupDiagnosticsResult,
   SystemHealthSnapshot,
 } from '../system-health'
@@ -99,6 +103,12 @@ export const electronProactiveCompanionRefreshRuntime = defineInvokeEventa<Proac
 export const electronProactiveCompanionClearHistory = defineInvokeEventa<ProactiveCompanionRuntimeSnapshot>('eventa:invoke:electron:proactive-companion:clear-history')
 export const electronProactiveCompanionEvaluateSparkNotify = defineInvokeEventa<ProactiveCompanionEvaluateResult, ProactiveCompanionSparkNotifyInput>('eventa:invoke:electron:proactive-companion:evaluate-spark-notify')
 export const electronProactiveCompanionRecordContextUpdate = defineInvokeEventa<ProactiveCompanionRuntimeSnapshot, ProactiveCompanionContextUpdateInput>('eventa:invoke:electron:proactive-companion:record-context-update')
+
+export const electronScreenContextLoadSettings = defineInvokeEventa<ScreenContextSettings>('eventa:invoke:electron:screen-context:load-settings')
+export const electronScreenContextSaveSettings = defineInvokeEventa<ScreenContextSettings, ScreenContextSettings>('eventa:invoke:electron:screen-context:save-settings')
+export const electronScreenContextGetRuntimeSnapshot = defineInvokeEventa<ScreenContextRuntimeSnapshot>('eventa:invoke:electron:screen-context:get-runtime-snapshot')
+export const electronScreenContextRefreshRuntime = defineInvokeEventa<ScreenContextRuntimeSnapshot>('eventa:invoke:electron:screen-context:refresh-runtime')
+export const electronScreenContextClearHistory = defineInvokeEventa<ScreenContextRuntimeSnapshot>('eventa:invoke:electron:screen-context:clear-history')
 export const electronNahidaPersonaGetConfig = defineInvokeEventa<NahidaPersonaSettings>('eventa:invoke:electron:nahida-persona:get-config')
 export const electronNahidaPersonaSaveConfig = defineInvokeEventa<NahidaPersonaSettings, NahidaPersonaSettings>('eventa:invoke:electron:nahida-persona:save-config')
 export const electronCompanionCoordinationGetSnapshot = defineInvokeEventa<CompanionCoordinationSnapshot, CompanionCoordinationRefreshRequest | undefined>('eventa:invoke:electron:companion-coordination:get-snapshot')

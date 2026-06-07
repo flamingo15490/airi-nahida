@@ -41,6 +41,7 @@ import { setupMcpStdioManager } from './services/airi/mcp-servers'
 import { createNahidaPersonaManager } from './services/airi/nahida-persona'
 import { setupPluginHost } from './services/airi/plugins'
 import { createProactiveCompanionManager } from './services/airi/proactive-companion'
+import { createScreenContextManager } from './services/airi/screen-context'
 import { createSystemHealthManager, createSystemHealthService } from './services/airi/system-health'
 import { setupArtistryBridge } from './services/airi/widgets/artistry-bridge'
 import { setupAutoUpdater } from './services/electron/auto-updater'
@@ -218,6 +219,11 @@ app.whenReady().then(async () => {
       externalIntegrationsManager: dependsOn.externalIntegrationsManager,
     }),
   })
+  const screenContextManager = injeca.provide('modules:screen-context-manager', {
+    build: async () => createScreenContextManager({
+      userDataPath: app.getPath('userData'),
+    }),
+  })
   const nahidaPersonaManager = injeca.provide('modules:nahida-persona-manager', {
     build: async () => createNahidaPersonaManager(),
   })
@@ -295,12 +301,12 @@ app.whenReady().then(async () => {
   })
 
   const settingsWindow = injeca.provide('windows:settings', {
-    dependsOn: { widgetsManager, beatSync, autoUpdater, devtoolsWindow: devtoolsMarkdownStressWindow, serverChannel, godotStageManager, mcpStdioManager, externalIntegrationsManager, proactiveCompanionManager, externalMemoryManager, nahidaPersonaManager, companionCoordinationManager, i18n, windowAuthManager, globalShortcut },
+    dependsOn: { widgetsManager, beatSync, autoUpdater, devtoolsWindow: devtoolsMarkdownStressWindow, serverChannel, godotStageManager, mcpStdioManager, externalIntegrationsManager, proactiveCompanionManager, externalMemoryManager, screenContextManager, nahidaPersonaManager, companionCoordinationManager, i18n, windowAuthManager, globalShortcut },
     build: async ({ dependsOn }) => setupSettingsWindowReusableFunc(dependsOn),
   })
 
   const mainWindow = injeca.provide('windows:main', {
-    dependsOn: { settingsWindow, chatWindow, widgetsManager, noticeWindow, beatSync, autoUpdater, serverChannel, godotStageManager, mcpStdioManager, externalIntegrationsManager, proactiveCompanionManager, externalMemoryManager, nahidaPersonaManager, companionCoordinationManager, i18n, onboardingWindowManager, windowAuthManager },
+    dependsOn: { settingsWindow, chatWindow, widgetsManager, noticeWindow, beatSync, autoUpdater, serverChannel, godotStageManager, mcpStdioManager, externalIntegrationsManager, proactiveCompanionManager, externalMemoryManager, screenContextManager, nahidaPersonaManager, companionCoordinationManager, i18n, onboardingWindowManager, windowAuthManager },
     build: async ({ dependsOn }) => setupMainWindow({
       ...dependsOn,
       onWindowCreated: (window) => {

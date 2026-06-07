@@ -342,6 +342,22 @@ export const useExternalMemoryStore = defineStore('external-memory', () => {
   const judgementSnapshot = computed(() => normalizeJudgementSnapshot(usage.value.judgement))
   const turnSnapshot = computed(() => normalizeTurnSnapshot(usage.value.turn, context.value))
   const writeReviewSnapshot = computed(() => normalizeWriteReviewSnapshot(usage.value.lastWriteReview ?? usage.value.lastWrite?.review))
+
+  /** Canonical summary for recall/writeback/memory truth, with fallback to turnSnapshot. */
+  const canonicalSummary = computed(() => {
+    const channels = judgementSnapshot.value.summaryChannels
+    if (channels?.canonicalSummary)
+      return channels.canonicalSummary
+    return turnSnapshot.value.summary || ''
+  })
+
+  /** Persona summary for Nahida expression support, with fallback to turnSnapshot. */
+  const personaSummary = computed(() => {
+    const channels = judgementSnapshot.value.summaryChannels
+    if (channels?.personaSummary)
+      return channels.personaSummary
+    return turnSnapshot.value.summary || ''
+  })
   const latestPersistedWrite = computed(() => {
     if (usage.value.lastWrite?.decision === 'written')
       return usage.value.lastWrite
@@ -584,6 +600,8 @@ export const useExternalMemoryStore = defineStore('external-memory', () => {
     loading,
     refreshing,
     turnSnapshot,
+    canonicalSummary,
+    personaSummary,
     usage,
     writeReviewSnapshot,
     writing,

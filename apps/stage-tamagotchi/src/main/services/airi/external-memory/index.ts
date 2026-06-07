@@ -13,9 +13,11 @@ import type {
   ExternalMemoryJudgementSnapshot,
   ExternalMemoryLayerKind,
   ExternalMemoryLoadRequest,
+  ExternalMemoryMemorizeDecisionSnapshot,
   ExternalMemoryObservationRecord,
   ExternalMemoryObservationSource,
   ExternalMemoryReadSnapshot,
+  ExternalMemoryRecallDecisionSnapshot,
   ExternalMemorySelectionDecision,
   ExternalMemoryTurnSnapshot,
   ExternalMemoryUsageSnapshot,
@@ -960,6 +962,8 @@ export function createExternalMemoryManager(params: {
   userDataPath: string
 }): ExternalMemoryManager {
   let lastUsage = createDefaultExternalMemoryUsageSnapshot()
+  let lastRecallDecision: ExternalMemoryRecallDecisionSnapshot | undefined
+  let lastMemorizeDecision: ExternalMemoryMemorizeDecisionSnapshot | undefined
   const writeOccurrenceMaps = new Map<ExternalMemoryDocumentKind, Map<string, number>>()
   const candidateLedgerPath = join(params.userDataPath, candidateLedgerFileName)
 
@@ -1231,7 +1235,26 @@ export function createExternalMemoryManager(params: {
     return snapshot
   }
 
+  const SCREEN_DERIVED_SOURCES: ReadonlySet<ExternalMemoryObservationSource> = new Set([
+    'screen-peek',
+    'screen-usage-context',
+  ])
+
+  const SCREEN_DERIVED_ALLOWED_KINDS: ReadonlySet<ExternalMemoryCandidateKind> = new Set([
+    'recent-summary',
+    'follow-ups',
+  ])
+
   async function recordMemoryObservation(request: ExternalMemoryObservationRecord) {
+    // NOTICE:
+    // Screen-derived observations (screen-peek, screen-usage-context) must only
+    // enter recent-summary or follow-ups. They must never directly generate
+    // stable user-profile or preferences entries.
+    // This boundary prevents transient screen data from polluting long-lived memory.
+    if (SCREEN_DERIVED_SOURCES.has(request.source) && !SCREEN_DERIVED_ALLOWED_KINDS.has(request.kind)) {
+      return await refreshMemoryJudgement()
+    }
+
     const normalizedText = normalizeComparisonText(request.text)
     const observedAt = request.observedAt ?? Date.now()
     const ledger = await readCandidateLedgerFile()
@@ -1287,10 +1310,18 @@ export function createExternalMemoryManager(params: {
   }
 
   function recordWrite(result: ExternalMemoryWriteResult) {
+    lastMemorizeDecision = {
+      decision: result.decision,
+      kind: result.kind,
+      reason: result.reason.code,
+      reviewedAt: result.writtenAt,
+    }
     updateUsage({
       lastWrite: result,
       lastWriteReview: result.review,
       recentWrites: [result, ...lastUsage.recentWrites].slice(0, maxRecentWrites),
+      lastRecallDecision,
+      lastMemorizeDecision,
     })
   }
 
@@ -1426,6 +1457,12 @@ export function createExternalMemoryManager(params: {
       sections,
     }
 
+    lastRecallDecision = {
+      selectedLayers: usedLayers,
+      suppressedLayers: EXTERNAL_MEMORY_LAYER_KINDS.filter(l => !usedLayers.includes(l)),
+      reason: usedLayers.length > 0 ? 'layer-selected' : 'context-empty',
+    }
+
     updateUsage({
       bridgeState: resolvedRoot.state,
       reason: createBridgeReason(resolvedRoot.state),
@@ -1437,6 +1474,8 @@ export function createExternalMemoryManager(params: {
       lastReadSummary: summary,
       lastReadError: documents.find(document => document.error)?.error,
       lastUsedDocumentKinds: usedKinds,
+      lastRecallDecision,
+      lastMemorizeDecision,
     })
 
     return context

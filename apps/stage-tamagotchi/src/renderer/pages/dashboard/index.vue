@@ -1,14 +1,20 @@
 <script setup lang="ts">
 import { useElectronEventaInvoke } from '@proj-airi/electron-vueuse'
 import { useCompanionCoordinationStore } from '@proj-airi/stage-ui/stores/companion-coordination-store'
+import { useExternalMemoryStore } from '@proj-airi/stage-ui/stores/external-memory-store'
+import { useScreenContextStore } from '@proj-airi/stage-ui/stores/screen-context'
 import { storeToRefs } from 'pinia'
 import { computed } from 'vue'
 
 import { electronOpenSettings } from '../../../shared/eventa'
 
 const coordinationStore = useCompanionCoordinationStore()
+const externalMemoryStore = useExternalMemoryStore()
+const screenContextStore = useScreenContextStore()
 const openSettings = useElectronEventaInvoke(electronOpenSettings)
 const { clearing, refreshing, snapshot } = storeToRefs(coordinationStore)
+const { judgementSnapshot, turnSnapshot, canonicalSummary } = storeToRefs(externalMemoryStore)
+const { snapshot: screenContext, captureFreshness, contextFreshness } = storeToRefs(screenContextStore)
 
 const statusToneMap = {
   ready: {
@@ -224,6 +230,84 @@ async function openSurfaceDetail(surface: 'memory' | 'persona' | 'proactive') {
               >
                 打开详情
               </button>
+            </div>
+          </div>
+        </article>
+      </section>
+
+      <section :class="['grid', 'gap-4', 'lg:grid-cols-2']">
+        <article :class="['flex', 'flex-col', 'gap-4', 'rounded-[24px]', 'border', 'border-sky-200/70', 'bg-sky-50/75', 'p-5', 'shadow-[0_20px_60px_rgba(15,23,42,0.06)]', 'dark:border-sky-900/50', 'dark:bg-sky-950/20']">
+          <div :class="['flex', 'flex-col', 'gap-1']">
+            <h2 :class="['text-xl', 'font-semibold']">
+              Screen Context
+            </h2>
+            <p :class="['text-sm', 'leading-6', 'text-neutral-600', 'dark:text-neutral-300']">
+              Read-only explainability block for the current screen-context runtime state.
+            </p>
+          </div>
+
+          <div :class="['grid', 'gap-2', 'text-sm']">
+            <div :class="['flex', 'items-center', 'justify-between']">
+              <span :class="['text-neutral-500', 'dark:text-neutral-400']">Source mode</span>
+              <span :class="['font-medium', 'text-neutral-800', 'dark:text-neutral-100']">{{ screenContext.sourceMode || 'Unconfigured' }}</span>
+            </div>
+            <div :class="['flex', 'items-center', 'justify-between']">
+              <span :class="['text-neutral-500', 'dark:text-neutral-400']">Presence</span>
+              <span :class="['font-medium', screenContext.isRunning ? 'text-emerald-700 dark:text-emerald-300' : 'text-neutral-500 dark:text-neutral-400']">{{ screenContext.isRunning ? 'Active' : 'Idle' }}</span>
+            </div>
+            <div :class="['flex', 'items-center', 'justify-between']">
+              <span :class="['text-neutral-500', 'dark:text-neutral-400']">Capture freshness</span>
+              <span :class="['font-medium', 'text-neutral-800', 'dark:text-neutral-100']">{{ captureFreshness }}</span>
+            </div>
+            <div :class="['flex', 'items-center', 'justify-between']">
+              <span :class="['text-neutral-500', 'dark:text-neutral-400']">Context freshness</span>
+              <span :class="['font-medium', 'text-neutral-800', 'dark:text-neutral-100']">{{ contextFreshness }}</span>
+            </div>
+            <div :class="['flex', 'items-center', 'justify-between']">
+              <span :class="['text-neutral-500', 'dark:text-neutral-400']">Screen peeks</span>
+              <span :class="['font-medium', 'text-neutral-800', 'dark:text-neutral-100']">{{ screenContext.captureCount }} ({{ screenContext.captureRatePerMinute }}/min)</span>
+            </div>
+            <div :class="['flex', 'items-center', 'justify-between']">
+              <span :class="['text-neutral-500', 'dark:text-neutral-400']">Usage context updates</span>
+              <span :class="['font-medium', 'text-neutral-800', 'dark:text-neutral-100']">{{ screenContext.contextUpdateCount }} ({{ screenContext.contextUpdateRatePerMinute }}/min)</span>
+            </div>
+          </div>
+        </article>
+
+        <article :class="['flex', 'flex-col', 'gap-4', 'rounded-[24px]', 'border', 'border-violet-200/70', 'bg-violet-50/75', 'p-5', 'shadow-[0_20px_60px_rgba(15,23,42,0.06)]', 'dark:border-violet-900/50', 'dark:bg-violet-950/20']">
+          <div :class="['flex', 'flex-col', 'gap-1']">
+            <h2 :class="['text-xl', 'font-semibold']">
+              Memory Judgement
+            </h2>
+            <p :class="['text-sm', 'leading-6', 'text-neutral-600', 'dark:text-neutral-300']">
+              Read-only explainability block for the latest memory judgement and recall snapshot.
+            </p>
+          </div>
+
+          <div :class="['grid', 'gap-2', 'text-sm']">
+            <div :class="['flex', 'items-center', 'justify-between']">
+              <span :class="['text-neutral-500', 'dark:text-neutral-400']">Judgement summary</span>
+              <span :class="['max-w-[60%]', 'text-right', 'font-medium', 'text-neutral-800', 'dark:text-neutral-100']">{{ judgementSnapshot.summary || 'No judgement yet' }}</span>
+            </div>
+            <div :class="['flex', 'items-center', 'justify-between']">
+              <span :class="['text-neutral-500', 'dark:text-neutral-400']">Turn summary</span>
+              <span :class="['max-w-[60%]', 'text-right', 'font-medium', 'text-neutral-800', 'dark:text-neutral-100']">{{ canonicalSummary || turnSnapshot.summary || 'No turn snapshot' }}</span>
+            </div>
+            <div :class="['flex', 'items-center', 'justify-between']">
+              <span :class="['text-neutral-500', 'dark:text-neutral-400']">Stable candidates</span>
+              <span :class="['font-medium', 'text-emerald-700', 'dark:text-emerald-300']">{{ judgementSnapshot.statusCounts.stable }}</span>
+            </div>
+            <div :class="['flex', 'items-center', 'justify-between']">
+              <span :class="['text-neutral-500', 'dark:text-neutral-400']">Tentative candidates</span>
+              <span :class="['font-medium', 'text-amber-700', 'dark:text-amber-300']">{{ judgementSnapshot.statusCounts.tentative }}</span>
+            </div>
+            <div :class="['flex', 'items-center', 'justify-between']">
+              <span :class="['text-neutral-500', 'dark:text-neutral-400']">Conflicted</span>
+              <span :class="['font-medium', 'text-rose-700', 'dark:text-rose-300']">{{ judgementSnapshot.statusCounts.conflicted }}</span>
+            </div>
+            <div :class="['flex', 'items-center', 'justify-between']">
+              <span :class="['text-neutral-500', 'dark:text-neutral-400']">Used layers</span>
+              <span :class="['font-medium', 'text-neutral-800', 'dark:text-neutral-100']">{{ turnSnapshot.usedLayers.length > 0 ? turnSnapshot.usedLayers.join(', ') : 'None' }}</span>
             </div>
           </div>
         </article>

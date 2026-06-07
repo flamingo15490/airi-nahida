@@ -1,5 +1,7 @@
 import type { createContext } from '@moeru/eventa/adapters/electron/main'
+import type { CompanionCoordinationExplainabilityBlock } from '@proj-airi/stage-ui/stores/companion-coordination-shared'
 import type { NahidaPersonaSnapshot } from '@proj-airi/stage-ui/stores/nahida-persona-shared'
+import type { ScreenContextProvider } from '@proj-airi/stage-ui/stores/proactive-companion-shared'
 
 import type {
   CompanionCoordinationRefreshRequest,
@@ -55,8 +57,61 @@ export function createCompanionCoordinationManager(params: {
   externalMemoryManager: ExternalMemoryManager
   nahidaPersonaManager: NahidaPersonaManager
   proactiveCompanionManager: ProactiveCompanionManager
+  screenContextProvider?: ScreenContextProvider
 }): CompanionCoordinationManager {
   let lastSnapshot = createDefaultCompanionCoordinationSnapshot()
+
+  function composeScreenContextBlock(): CompanionCoordinationExplainabilityBlock {
+    if (!params.screenContextProvider) {
+      return {
+        summary: '屏幕上下文提供者不可用。',
+        reason: '当前运行时未配置屏幕上下文提供者，因此无法生成屏幕上下文说明。',
+      }
+    }
+
+    const presence = params.screenContextProvider.getPresence()
+    const freshnessMs = params.screenContextProvider.getFreshnessMs()
+
+    if (presence === 'away') {
+      return {
+        summary: '用户当前不在屏幕前。',
+        reason: '屏幕上下文检测到用户 presence 为 away，表明用户可能暂时离开。',
+        updatedAt: Date.now(),
+      }
+    }
+
+    if (freshnessMs !== null && freshnessMs > 5 * 60 * 1000) {
+      return {
+        summary: '屏幕上下文快照已过时。',
+        reason: `最近一次屏幕上下文更新距今已超过 ${Math.floor(freshnessMs / 1000)} 秒，数据可能不再反映当前状态。`,
+        updatedAt: Date.now(),
+      }
+    }
+
+    return {
+      summary: '屏幕上下文当前可用。',
+      reason: '屏幕上下文提供者运行正常，用户 presence 为 active。',
+      updatedAt: Date.now(),
+    }
+  }
+
+  function composeMemoryJudgementBlock(): CompanionCoordinationExplainabilityBlock {
+    const usage = params.externalMemoryManager.getLastMemoryUsage()
+    const judgement = usage.judgement
+
+    if (!judgement || judgement.refreshedAt === 0) {
+      return {
+        summary: '记忆判断尚未初始化。',
+        reason: '当前运行时还没有记录过记忆判断快照。',
+      }
+    }
+
+    return {
+      summary: judgement.summary,
+      reason: judgement.reason,
+      updatedAt: judgement.refreshedAt,
+    }
+  }
 
   async function composeSnapshot(request?: CompanionCoordinationRefreshRequest) {
     const memoryUsage = params.externalMemoryManager.getLastMemoryUsage()
@@ -66,6 +121,8 @@ export function createCompanionCoordinationManager(params: {
       memoryUsage,
       persona,
       proactiveRuntime,
+      screenContext: composeScreenContextBlock(),
+      memoryJudgement: composeMemoryJudgementBlock(),
     })
 
     lastSnapshot = snapshot

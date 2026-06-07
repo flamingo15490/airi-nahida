@@ -42,6 +42,8 @@ export const EXTERNAL_MEMORY_OBSERVATION_SOURCES = [
   'manual-session-summary',
   'manual-candidate-review',
   'system-refresh',
+  'screen-peek',
+  'screen-usage-context',
 ] as const
 
 export const EXTERNAL_MEMORY_CANDIDATE_STATUSES = [
@@ -92,6 +94,69 @@ const EXTERNAL_MEMORY_REASON_MESSAGES = {
   'write-skipped-duplicate': '已评审的记忆候选与现有记忆内容重复，因此无需写回。',
   'write-skipped-not-stable': '已评审的记忆候选因稳定性不足而被拒绝写回。',
 } satisfies Record<ExternalMemoryReasonCode, string>
+
+/**
+ * Quality assessment for a memory summary produced by the dual-channel pipeline.
+ */
+export interface ExternalMemorySummaryQuality {
+  /** Overall quality level of the summary. */
+  level: 'good' | 'degraded' | 'poor'
+  /** List of quality issues detected during summary production. */
+  issues: string[]
+}
+
+/**
+ * Dual-channel summary snapshot containing both canonical and persona variants.
+ *
+ * `canonicalSummary` is safe for recall, writeback, and memory truth.
+ * `personaSummary` supports Nahida expression and must not be written to disk.
+ */
+export interface ExternalMemorySummaryChannelsSnapshot {
+  /** Canonical summary for recall/writeback/memory truth. */
+  canonicalSummary: string
+  /** Persona-flavored summary for Nahida expression support. */
+  personaSummary: string
+  /** Quality assessment for the combined summary output. */
+  quality: ExternalMemorySummaryQuality
+}
+
+/**
+ * Describes the source window used to build an external memory context.
+ */
+export interface ExternalMemorySourceWindowSnapshot {
+  /** Start of the observation window (UNIX timestamp). */
+  windowStart: number
+  /** End of the observation window (UNIX timestamp). */
+  windowEnd: number
+  /** Kinds of sources observed in the window. */
+  sourceKinds: string[]
+}
+
+/**
+ * Records the last recall layer selection decision.
+ */
+export interface ExternalMemoryRecallDecisionSnapshot {
+  /** Layers selected for recall. */
+  selectedLayers: string[]
+  /** Layers suppressed during recall. */
+  suppressedLayers: string[]
+  /** Machine-readable reason for the selection. */
+  reason: string
+}
+
+/**
+ * Records the last memorize/write decision.
+ */
+export interface ExternalMemoryMemorizeDecisionSnapshot {
+  /** Final write decision. */
+  decision: string
+  /** Kind of document targeted by the memorize action. */
+  kind: string
+  /** Machine-readable reason for the decision. */
+  reason: string
+  /** UNIX timestamp when the decision was reviewed. */
+  reviewedAt: number
+}
 
 /**
  * Stable reason payload shared by runtime, IPC, renderer stores, and tests.
@@ -173,6 +238,10 @@ export interface ExternalMemoryCandidateSnapshot {
   observationCount: number
   /** Whether the candidate was explicitly marked as a strong stable signal. */
   strongSignal: boolean
+  /** UNIX timestamp when the candidate was last reinforced by a consistent observation. */
+  lastReinforcedAt?: number
+  /** UNIX timestamp when the candidate was last accessed during recall. */
+  lastAccessedAt?: number
 }
 
 /**
@@ -211,6 +280,12 @@ export interface ExternalMemoryJudgementSnapshot {
   conflicts: ExternalMemoryConflictSnapshot[]
   /** Stable write recommendations derived from the current candidates. */
   recommendations: ExternalMemoryWriteRecommendation[]
+  /** Dual-channel summary output when available. */
+  summaryChannels?: ExternalMemorySummaryChannelsSnapshot
+  /** Last recall layer selection decision. */
+  lastRecallDecision?: ExternalMemoryRecallDecisionSnapshot
+  /** Last memorize/write decision. */
+  lastMemorizeDecision?: ExternalMemoryMemorizeDecisionSnapshot
 }
 
 /**
@@ -477,6 +552,10 @@ export interface ExternalMemoryUsageSnapshot {
   recentWrites: ExternalMemoryWriteResult[]
   /** Document kinds that the latest context actually contributed to prompts. */
   lastUsedDocumentKinds: ExternalMemoryDocumentKind[]
+  /** Last recall layer selection decision. */
+  lastRecallDecision?: ExternalMemoryRecallDecisionSnapshot
+  /** Last memorize/write decision. */
+  lastMemorizeDecision?: ExternalMemoryMemorizeDecisionSnapshot
 }
 
 /**

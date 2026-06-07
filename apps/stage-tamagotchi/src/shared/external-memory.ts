@@ -10,12 +10,17 @@ import type {
   ExternalMemoryEvidenceSnapshot as BaseExternalMemoryEvidenceSnapshot,
   ExternalMemoryJudgementSnapshot as BaseExternalMemoryJudgementSnapshot,
   ExternalMemoryLayerKind as BaseExternalMemoryLayerKind,
+  ExternalMemoryMemorizeDecisionSnapshot as BaseExternalMemoryMemorizeDecisionSnapshot,
   ExternalMemoryObservationRecord as BaseExternalMemoryObservationRecord,
   ExternalMemoryObservationSource as BaseExternalMemoryObservationSource,
   ExternalMemoryReadSnapshot as BaseExternalMemoryReadSnapshot,
   ExternalMemoryReasonCode as BaseExternalMemoryReasonCode,
   ExternalMemoryReasonSnapshot as BaseExternalMemoryReasonSnapshot,
+  ExternalMemoryRecallDecisionSnapshot as BaseExternalMemoryRecallDecisionSnapshot,
   ExternalMemorySelectionDecision as BaseExternalMemorySelectionDecision,
+  ExternalMemorySourceWindowSnapshot as BaseExternalMemorySourceWindowSnapshot,
+  ExternalMemorySummaryChannelsSnapshot as BaseExternalMemorySummaryChannelsSnapshot,
+  ExternalMemorySummaryQuality as BaseExternalMemorySummaryQuality,
   ExternalMemoryTurnSnapshot as BaseExternalMemoryTurnSnapshot,
   ExternalMemoryUsageSnapshot as BaseExternalMemoryUsageSnapshot,
   ExternalMemoryWriteCandidate as BaseExternalMemoryWriteCandidate,
@@ -45,6 +50,11 @@ export type ExternalMemoryLayerKind = BaseExternalMemoryLayerKind
 export type ExternalMemoryObservationSource = BaseExternalMemoryObservationSource
 export type ExternalMemoryReasonCode = BaseExternalMemoryReasonCode
 export type ExternalMemoryWriteDecision = BaseExternalMemoryWriteDecision
+export type ExternalMemorySummaryQuality = BaseExternalMemorySummaryQuality
+export type ExternalMemorySummaryChannelsSnapshot = BaseExternalMemorySummaryChannelsSnapshot
+export type ExternalMemorySourceWindowSnapshot = BaseExternalMemorySourceWindowSnapshot
+export type ExternalMemoryRecallDecisionSnapshot = BaseExternalMemoryRecallDecisionSnapshot
+export type ExternalMemoryMemorizeDecisionSnapshot = BaseExternalMemoryMemorizeDecisionSnapshot
 
 export {
   EXTERNAL_MEMORY_LAYER_KINDS,
@@ -61,11 +71,23 @@ export interface ExternalMemoryObservationRecord extends BaseExternalMemoryObser
 
 export interface ExternalMemoryConflictSnapshot extends BaseExternalMemoryConflictSnapshot {}
 
-export interface ExternalMemoryCandidateSnapshot extends BaseExternalMemoryCandidateSnapshot {}
+export interface ExternalMemoryCandidateSnapshot extends BaseExternalMemoryCandidateSnapshot {
+  /** UNIX timestamp when the candidate was last reinforced by a consistent observation. */
+  lastReinforcedAt?: number
+  /** UNIX timestamp when the candidate was last accessed during recall. */
+  lastAccessedAt?: number
+}
 
 export interface ExternalMemoryWriteRecommendation extends BaseExternalMemoryWriteRecommendation {}
 
-export interface ExternalMemoryJudgementSnapshot extends BaseExternalMemoryJudgementSnapshot {}
+export interface ExternalMemoryJudgementSnapshot extends BaseExternalMemoryJudgementSnapshot {
+  /** Dual-channel summary output when available. */
+  summaryChannels?: ExternalMemorySummaryChannelsSnapshot
+  /** Last recall layer selection decision. */
+  lastRecallDecision?: ExternalMemoryRecallDecisionSnapshot
+  /** Last memorize/write decision. */
+  lastMemorizeDecision?: ExternalMemoryMemorizeDecisionSnapshot
+}
 
 export interface ExternalMemoryEvidenceSnapshot extends BaseExternalMemoryEvidenceSnapshot {
   normalizedText?: string
@@ -154,6 +176,10 @@ export interface ExternalMemoryUsageSnapshot extends BaseExternalMemoryUsageSnap
   lastWrite?: ExternalMemoryWriteResult
   lastWriteReview?: ExternalMemoryWriteReviewSnapshot
   recentWrites: ExternalMemoryWriteResult[]
+  /** Last recall layer selection decision. */
+  lastRecallDecision?: ExternalMemoryRecallDecisionSnapshot
+  /** Last memorize/write decision. */
+  lastMemorizeDecision?: ExternalMemoryMemorizeDecisionSnapshot
 }
 
 /**

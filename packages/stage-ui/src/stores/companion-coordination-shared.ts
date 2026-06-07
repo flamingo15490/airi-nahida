@@ -88,6 +88,22 @@ export interface CompanionCoordinationSurfaceSnapshot {
 }
 
 /**
+ * Explainability block for one coordination subsystem that surfaces a
+ * short human-readable summary and reason for the current state.
+ *
+ * Used to give the coordination dashboard and prompt supplements visibility
+ * into why screen-context or memory-judgement are in their current state.
+ */
+export interface CompanionCoordinationExplainabilityBlock {
+  /** One-line summary of the subsystem's current state. */
+  summary: string
+  /** User-facing reason explaining why the subsystem reached this state. */
+  reason: string
+  /** UNIX timestamp of the latest snapshot refresh, when available. */
+  updatedAt?: number
+}
+
+/**
  * Aggregated phase-six snapshot used by the coordination dashboard.
  */
 export interface CompanionCoordinationSnapshot {
@@ -107,6 +123,10 @@ export interface CompanionCoordinationSnapshot {
   inactiveCount: number
   /** Latest timestamp observed across all surfaces when available. */
   updatedAt?: number
+  /** Explainability block for the screen-context subsystem, when available. */
+  screenContext?: CompanionCoordinationExplainabilityBlock
+  /** Explainability block for the memory-judgement subsystem, when available. */
+  memoryJudgement?: CompanionCoordinationExplainabilityBlock
 }
 
 /**
@@ -420,6 +440,10 @@ export function composeCompanionCoordinationSnapshot(params: {
   memoryUsage: ExternalMemoryUsageSnapshot
   persona: NahidaPersonaSnapshot
   proactiveRuntime: ProactiveCompanionRuntimeSnapshot
+  /** Optional explainability block for the screen-context subsystem. */
+  screenContext?: CompanionCoordinationExplainabilityBlock
+  /** Optional explainability block for the memory-judgement subsystem. */
+  memoryJudgement?: CompanionCoordinationExplainabilityBlock
 }): CompanionCoordinationSnapshot {
   const memory = composeMemorySurface(params.memoryUsage)
   const persona = composePersonaSurface(params.persona)
@@ -454,6 +478,8 @@ export function composeCompanionCoordinationSnapshot(params: {
       attentionCount,
       inactiveCount,
       updatedAt,
+      screenContext: params.screenContext,
+      memoryJudgement: params.memoryJudgement,
     }
   }
 
@@ -472,6 +498,8 @@ export function composeCompanionCoordinationSnapshot(params: {
       attentionCount,
       inactiveCount,
       updatedAt,
+      screenContext: params.screenContext,
+      memoryJudgement: params.memoryJudgement,
     }
   }
 
@@ -487,6 +515,8 @@ export function composeCompanionCoordinationSnapshot(params: {
     attentionCount,
     inactiveCount,
     updatedAt,
+    screenContext: params.screenContext,
+    memoryJudgement: params.memoryJudgement,
   }
 }
 

@@ -1,4 +1,5 @@
 import type { createContext } from '@moeru/eventa/adapters/electron/main'
+import type { ScreenContextProvider } from '@proj-airi/stage-ui/stores/proactive-companion-shared'
 
 import type { ExternalCompanionSidecarConfig, ExternalIntegrationSnapshot } from '../../../../shared/external-integrations'
 import type {
@@ -37,6 +38,7 @@ import { createConfig } from '../../../libs/electron/persistence'
 type MainContext = ReturnType<typeof createContext>['context']
 
 const maxRecentDecisions = 30
+const defaultStaleThresholdMs = 5 * 60 * 1000
 const importantKinds = new Set(['important', 'alarm', 'critical', 'urgent'])
 const reminderKinds = new Set(['reminder', 'todo', 'follow-up'])
 const gentleCheckInKinds = new Set(['gentle-check-in', 'check-in', 'checkin', 'nudge', 'ping'])
@@ -327,6 +329,7 @@ function buildDecision(params: {
   matchedSource: boolean
   sidecarReady: boolean
   cooldownUntil?: number
+  screenContextHint?: ProactiveCompanionDecisionSnapshot['screenContextHint']
 }): ProactiveCompanionDecisionSnapshot {
   return {
     event: params.event,
@@ -336,6 +339,7 @@ function buildDecision(params: {
     matchedSource: params.matchedSource,
     sidecarReady: params.sidecarReady,
     cooldownUntil: params.cooldownUntil,
+    screenContextHint: params.screenContextHint,
     decidedAt: Date.now(),
   }
 }
@@ -387,6 +391,7 @@ export interface ProactiveCompanionManager {
 
 export function createProactiveCompanionManager(params: {
   externalIntegrationsManager: ExternalIntegrationsManager
+  screenContextProvider?: ScreenContextProvider
 }): ProactiveCompanionManager {
   const defaultConfig = createDefaultProactiveCompanionConfigFile()
   const configStore = createConfig('proactive-companion', 'v1.json', proactiveCompanionConfigFileSchema, {
@@ -455,6 +460,31 @@ export function createProactiveCompanionManager(params: {
     }
   }
 
+  /**
+   * Produces optional screen-context hints for suppress/defer decisions.
+   *
+   * These hints annotate the decision reason without changing the final
+   * deliver/suppress/defer outcome. They explain *why* the current
+   * screen-context state influenced the governance reasoning.
+   */
+  function gateEmbeddedCandidate(): ProactiveCompanionDecisionSnapshot['screenContextHint'] {
+    if (!params.screenContextProvider) {
+      return undefined
+    }
+
+    const presence = params.screenContextProvider.getPresence()
+    if (presence === 'away') {
+      return 'presence-away'
+    }
+
+    const freshnessMs = params.screenContextProvider.getFreshnessMs()
+    if (freshnessMs !== null && freshnessMs > defaultStaleThresholdMs) {
+      return 'screen-stale'
+    }
+
+    return undefined
+  }
+
   function evaluateSparkNotify(event: ProactiveCompanionSparkNotifyInput): ProactiveCompanionEvaluateResult {
     const settings = getSettings()
     const sidecarSnapshot = getSidecarSnapshot(params.externalIntegrationsManager)
@@ -482,6 +512,8 @@ export function createProactiveCompanionManager(params: {
     const globalCooldownUntil = lastDeliveredAt + settings.globalCooldownMs
     const topicCooldownUntil = (topicDeliveredAt.get(eventSnapshot.topicKey) ?? 0) + settings.topicCooldownMs
 
+    const screenContextHint = gateEmbeddedCandidate()
+
     const decision = (() => {
       if (!settings.enabled) {
         return buildDecision({
@@ -491,6 +523,7 @@ export function createProactiveCompanionManager(params: {
           presentation: 'silent',
           matchedSource,
           sidecarReady,
+          screenContextHint,
         })
       }
 
@@ -504,6 +537,7 @@ export function createProactiveCompanionManager(params: {
           presentation: 'silent',
           matchedSource,
           sidecarReady,
+          screenContextHint,
         })
       }
 
@@ -515,6 +549,7 @@ export function createProactiveCompanionManager(params: {
           presentation: 'silent',
           matchedSource,
           sidecarReady,
+          screenContextHint,
         })
       }
 
@@ -526,6 +561,7 @@ export function createProactiveCompanionManager(params: {
           presentation: 'silent',
           matchedSource,
           sidecarReady,
+          screenContextHint,
         })
       }
 
@@ -537,6 +573,7 @@ export function createProactiveCompanionManager(params: {
           presentation: 'silent',
           matchedSource,
           sidecarReady,
+          screenContextHint,
         })
       }
 
@@ -549,6 +586,7 @@ export function createProactiveCompanionManager(params: {
           matchedSource,
           sidecarReady,
           cooldownUntil: globalCooldownUntil,
+          screenContextHint,
         })
       }
 
@@ -561,6 +599,7 @@ export function createProactiveCompanionManager(params: {
           matchedSource,
           sidecarReady,
           cooldownUntil: topicCooldownUntil,
+          screenContextHint,
         })
       }
 
